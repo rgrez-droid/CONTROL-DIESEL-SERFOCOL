@@ -1,46 +1,84 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import base64
+from pathlib import Path
 
 # -------------------------------------------------------
 # CONFIGURACIÓN GENERAL
 # -------------------------------------------------------
 
 st.set_page_config(
-    page_title="Control de Diésel SERFOCOL",
+    page_title="Análisis Diésel SERFOCOL",
     page_icon="⛽",
     layout="wide"
 )
 
 # -------------------------------------------------------
-# ESTILO OSCURO PROFESIONAL
+# FUNCIÓN PARA CARGAR IMÁGENES
 # -------------------------------------------------------
 
-st.markdown("""
+def buscar_imagen(nombre_base):
+    extensiones = ["", ".png", ".jpg", ".jpeg", ".webp"]
+
+    for ext in extensiones:
+        ruta = Path(f"{nombre_base}{ext}")
+        if ruta.exists():
+            return ruta
+
+    return None
+
+
+def convertir_imagen_base64(ruta_imagen):
+    if ruta_imagen and ruta_imagen.exists():
+        with open(ruta_imagen, "rb") as img:
+            return base64.b64encode(img.read()).decode()
+    return None
+
+
+ruta_logo_superior = buscar_imagen("logo1")
+ruta_sello_agua = buscar_imagen("logoredondo")
+
+logo_superior = convertir_imagen_base64(ruta_logo_superior)
+sello_agua = convertir_imagen_base64(ruta_sello_agua)
+
+# -------------------------------------------------------
+# ESTILO GENERAL
+# -------------------------------------------------------
+
+st.markdown(f"""
 <style>
-    .stApp {
+    .stApp {{
         background-color: #0f172a;
         color: #e5e7eb;
-    }
+    }}
 
-    .main {
+    .main {{
         background-color: #0f172a;
-    }
+    }}
 
-    .titulo-principal {
+    .block-container {{
+        position: relative;
+        z-index: 2;
+        padding-top: 3rem;
+    }}
+
+    .titulo-principal {{
         font-size: 42px;
         font-weight: 800;
         color: #f8fafc;
-        margin-bottom: 5px;
-    }
+        margin-bottom: 8px;
+        line-height: 1.15;
+    }}
 
-    .subtitulo {
+    .subtitulo {{
         font-size: 18px;
         color: #cbd5e1;
         margin-bottom: 25px;
-    }
+        line-height: 1.4;
+    }}
 
-    .section-title {
+    .section-title {{
         font-size: 25px;
         font-weight: 800;
         color: #f8fafc;
@@ -48,62 +86,146 @@ st.markdown("""
         margin-bottom: 15px;
         border-left: 6px solid #f59e0b;
         padding-left: 12px;
-    }
+    }}
 
-    .card {
+    .card {{
         background: linear-gradient(135deg, #1e293b, #111827);
         padding: 22px;
         border-radius: 18px;
         box-shadow: 0px 4px 16px rgba(0,0,0,0.45);
         text-align: center;
         border: 1px solid #334155;
-    }
+    }}
 
-    .card-title {
+    .card-title {{
         font-size: 15px;
         color: #cbd5e1;
         font-weight: 600;
-    }
+    }}
 
-    .card-value {
+    .card-value {{
         font-size: 31px;
         color: #f59e0b;
         font-weight: 900;
         margin-top: 8px;
-    }
+    }}
 
-    div[data-testid="stDataFrame"] {
+    div[data-testid="stDataFrame"] {{
         background-color: #1e293b;
         border-radius: 12px;
-    }
+    }}
 
     .stSelectbox label,
     .stMultiSelect label,
     .stDateInput label,
-    .stNumberInput label {
+    .stNumberInput label {{
         color: #e5e7eb !important;
-        font-weight: 600;
-    }
+        font-weight: 700;
+    }}
 
-    h1, h2, h3, h4, h5, h6, p, label {
+    h1, h2, h3, h4, h5, h6, p, label {{
         color: #e5e7eb;
-    }
+    }}
+
+    /* Filtros con fondo claro */
+    div[data-baseweb="select"] > div {{
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
+        border-radius: 10px !important;
+        border: 1px solid #cbd5e1 !important;
+    }}
+
+    div[data-baseweb="select"] span {{
+        color: #0f172a !important;
+    }}
+
+    input {{
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
+        border-radius: 8px !important;
+    }}
+
+    /* Logo superior derecho dentro del encabezado */
+    .logo-header {{
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
+        width: 100%;
+        padding-top: 5px;
+    }}
+
+    .logo-header img {{
+        width: 190px;
+        max-width: 100%;
+        height: auto;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 6px;
+        border-radius: 10px;
+        box-shadow: 0px 4px 12px rgba(0,0,0,0.35);
+    }}
+
+    /* Sello de agua */
+    .sello-agua {{
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 0;
+        opacity: 0.08;
+        pointer-events: none;
+    }}
+
+    .sello-agua img {{
+        width: 620px;
+        max-width: 75vw;
+        height: auto;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------
-# TÍTULO
+# SELLO DE AGUA
 # -------------------------------------------------------
 
-st.markdown(
-    '<div class="titulo-principal">⛽ Dashboard de Control de Diésel SERFOCOL</div>',
-    unsafe_allow_html=True
-)
+if sello_agua:
+    st.markdown(
+        f"""
+        <div class="sello-agua">
+            <img src="data:image/png;base64,{sello_agua}">
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-st.markdown(
-    '<div class="subtitulo">Panel web profesional para analizar consumos de diésel por año, mes, equipo y operador.</div>',
-    unsafe_allow_html=True
-)
+# -------------------------------------------------------
+# ENCABEZADO CON TÍTULO Y LOGO SUPERIOR DERECHO
+# -------------------------------------------------------
+
+col_titulo, col_logo = st.columns([5, 1.2])
+
+with col_titulo:
+    st.markdown(
+        '<div class="titulo-principal">⛽ Análisis de Control de Consumo de Diésel SERFOCOL</div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        '<div class="subtitulo">Visualización consolidada para el seguimiento operacional del consumo de diésel por periodo, descripción, equipo y operador.</div>',
+        unsafe_allow_html=True
+    )
+
+with col_logo:
+    if logo_superior:
+        st.markdown(
+            f"""
+            <div class="logo-header">
+                <img src="data:image/png;base64,{logo_superior}">
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.warning("No se encontró logo1.")
 
 # -------------------------------------------------------
 # ARCHIVO EXCEL
@@ -165,6 +287,8 @@ try:
         12: "Diciembre"
     }
 
+    orden_meses = list(meses_espanol.values())
+
     df["Año"] = df["Fechas"].dt.year.astype(int)
     df["Mes"] = df["Fechas"].dt.month
     df["Mes_Nombre"] = df["Mes"].map(meses_espanol)
@@ -174,49 +298,46 @@ try:
     st.success("Planilla cargada correctamente.")
 
     # -------------------------------------------------------
-    # FILTROS
+    # FILTROS VISIBLES
     # -------------------------------------------------------
 
     st.markdown('<div class="section-title">🔎 Filtros de análisis</div>', unsafe_allow_html=True)
 
     df_filtrado = df.copy()
 
-    colf1, colf2, colf3, colf4 = st.columns(4)
+    colf1, colf2, colf3 = st.columns(3)
 
     with colf1:
         años = st.multiselect(
             "Año",
-            sorted(df["Año"].dropna().unique())
+            sorted(df["Año"].dropna().unique()),
+            placeholder="Seleccionar año"
         )
 
         if años:
             df_filtrado = df_filtrado[df_filtrado["Año"].isin(años)]
 
     with colf2:
-        if "Equipo" in df.columns:
-            equipos = st.multiselect(
-                "Equipo",
-                sorted(df["Equipo"].dropna().unique())
-            )
+        meses_disponibles = [
+            mes for mes in orden_meses
+            if mes in df["Mes_Nombre"].dropna().unique()
+        ]
 
-            if equipos:
-                df_filtrado = df_filtrado[df_filtrado["Equipo"].isin(equipos)]
+        meses = st.multiselect(
+            "Mes",
+            meses_disponibles,
+            placeholder="Seleccionar mes"
+        )
+
+        if meses:
+            df_filtrado = df_filtrado[df_filtrado["Mes_Nombre"].isin(meses)]
 
     with colf3:
-        if "Operador" in df.columns:
-            operadores = st.multiselect(
-                "Operador",
-                sorted(df["Operador"].dropna().unique())
-            )
-
-            if operadores:
-                df_filtrado = df_filtrado[df_filtrado["Operador"].isin(operadores)]
-
-    with colf4:
         if "Descripción" in df.columns:
             descripciones = st.multiselect(
                 "Descripción",
-                sorted(df["Descripción"].dropna().unique())
+                sorted(df["Descripción"].dropna().unique()),
+                placeholder="Seleccionar descripción"
             )
 
             if descripciones:
@@ -290,7 +411,7 @@ try:
         """, unsafe_allow_html=True)
 
     # -------------------------------------------------------
-    # CONFIGURACIÓN GENERAL DE GRÁFICOS
+    # CONFIGURACIÓN DE GRÁFICOS
     # -------------------------------------------------------
 
     template_dark = "plotly_dark"
