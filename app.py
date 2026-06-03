@@ -99,12 +99,17 @@ st.markdown(
             box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.45);
             text-align: center;
             border: 1px solid #334155;
+            min-height: 118px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }}
 
         .card-title {{
             font-size: 15px;
             color: #cbd5e1;
             font-weight: 600;
+            line-height: 1.25;
         }}
 
         .card-value {{
@@ -429,9 +434,17 @@ try:
         else 0
     )
 
-    total_equipos = (
-        df_filtrado["Equipo"].nunique()
-        if "Equipo" in df_filtrado.columns
+    # Promedio mensual de consumo:
+    # calcula el consumo total de cada periodo y luego obtiene su promedio
+    consumo_por_mes = (
+        df_filtrado
+        .groupby("Periodo")["Lts"]
+        .sum()
+    )
+
+    promedio_mensual_consumo = (
+        consumo_por_mes.mean()
+        if not consumo_por_mes.empty
         else 0
     )
 
@@ -474,8 +487,8 @@ try:
         st.markdown(
             f"""
             <div class="card">
-                <div class="card-title">Equipos registrados</div>
-                <div class="card-value">{total_equipos}</div>
+                <div class="card-title">Promedio mensual de consumo diesel</div>
+                <div class="card-value">{promedio_mensual_consumo:,.0f} L</div>
             </div>
             """,
             unsafe_allow_html=True
