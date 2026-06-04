@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------
-# FUNCION PARA CARGAR IMAGENES
+# FUNCIONES PARA CARGAR IMAGENES
 # -------------------------------------------------------
 
 def buscar_imagen(nombre_base):
@@ -49,40 +49,40 @@ sello_agua = convertir_imagen_base64(ruta_sello_agua)
 # -------------------------------------------------------
 
 st.markdown(
-    f"""
+    """
     <style>
-        .stApp {{
+        .stApp {
             background-color: #0f172a;
             color: #e5e7eb;
-        }}
+        }
 
-        .main {{
+        .main {
             background-color: #0f172a;
-        }}
+        }
 
-        .block-container {{
+        .block-container {
             position: relative;
             z-index: 2;
             padding-top: 3rem;
             padding-bottom: 1.5rem;
-        }}
+        }
 
-        .titulo-principal {{
+        .titulo-principal {
             font-size: 42px;
             font-weight: 800;
             color: #f8fafc;
             margin-bottom: 8px;
             line-height: 1.15;
-        }}
+        }
 
-        .subtitulo {{
+        .subtitulo {
             font-size: 18px;
             color: #cbd5e1;
             margin-bottom: 25px;
             line-height: 1.4;
-        }}
+        }
 
-        .section-title {{
+        .section-title {
             font-size: 25px;
             font-weight: 800;
             color: #f8fafc;
@@ -90,9 +90,9 @@ st.markdown(
             margin-bottom: 15px;
             border-left: 6px solid #f59e0b;
             padding-left: 12px;
-        }}
+        }
 
-        .card {{
+        .card {
             background: linear-gradient(135deg, #1e293b, #111827);
             padding: 22px;
             border-radius: 18px;
@@ -103,67 +103,67 @@ st.markdown(
             display: flex;
             flex-direction: column;
             justify-content: center;
-        }}
+        }
 
-        .card-title {{
+        .card-title {
             font-size: 15px;
             color: #cbd5e1;
             font-weight: 600;
             line-height: 1.25;
-        }}
+        }
 
-        .card-value {{
+        .card-value {
             font-size: 31px;
             color: #f59e0b;
             font-weight: 900;
             margin-top: 8px;
-        }}
+        }
 
-        div[data-testid="stDataFrame"] {{
+        div[data-testid="stDataFrame"] {
             background-color: #1e293b;
             border-radius: 12px;
-        }}
+        }
 
         .stSelectbox label,
         .stMultiSelect label,
         .stDateInput label,
-        .stNumberInput label {{
+        .stNumberInput label {
             color: #e5e7eb !important;
             font-weight: 700;
-        }}
+        }
 
-        h1, h2, h3, h4, h5, h6, p, label {{
+        h1, h2, h3, h4, h5, h6, p, label {
             color: #e5e7eb;
-        }}
+        }
 
         /* Filtros con fondo claro */
-        div[data-baseweb="select"] > div {{
+        div[data-baseweb="select"] > div {
             background-color: #f8fafc !important;
             color: #0f172a !important;
             border-radius: 10px !important;
             border: 1px solid #cbd5e1 !important;
-        }}
+        }
 
-        div[data-baseweb="select"] span {{
+        div[data-baseweb="select"] span {
             color: #0f172a !important;
-        }}
+        }
 
-        input {{
+        input {
             background-color: #f8fafc !important;
             color: #0f172a !important;
             border-radius: 8px !important;
-        }}
+        }
 
         /* Logo superior derecho */
-        .logo-header {{
+        .logo-header {
             display: flex;
             justify-content: flex-end;
             align-items: flex-start;
             width: 100%;
             padding-top: 5px;
-        }}
+        }
 
-        .logo-header img {{
+        .logo-header img {
             width: 190px;
             max-width: 100%;
             height: auto;
@@ -171,10 +171,10 @@ st.markdown(
             padding: 6px;
             border-radius: 10px;
             box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.35);
-        }}
+        }
 
         /* Sello de agua */
-        .sello-agua {{
+        .sello-agua {
             position: fixed;
             top: 50%;
             left: 50%;
@@ -182,16 +182,16 @@ st.markdown(
             z-index: 0;
             opacity: 0.08;
             pointer-events: none;
-        }}
+        }
 
-        .sello-agua img {{
+        .sello-agua img {
             width: 620px;
             max-width: 75vw;
             height: auto;
-        }}
+        }
 
         /* Pie de pagina */
-        .footer-panel {{
+        .footer-panel {
             width: 100%;
             margin-top: 65px;
             padding: 24px 10px 12px 10px;
@@ -200,12 +200,12 @@ st.markdown(
             color: #94a3b8;
             font-size: 14px;
             line-height: 1.7;
-        }}
+        }
 
-        .footer-panel strong {{
+        .footer-panel strong {
             color: #e2e8f0;
             font-size: 15px;
-        }}
+        }
     </style>
     """,
     unsafe_allow_html=True
@@ -235,7 +235,7 @@ with col_titulo:
     st.markdown(
         """
         <div class="titulo-principal">
-            ⛽ Analisis de Control de Consumo de Diesel SERFOCOL
+            ⛽ Control de Consumo de Diesel SERFOCOL
         </div>
         """,
         unsafe_allow_html=True
@@ -270,7 +270,7 @@ archivo_excel = "DIESEL SERFOCOL- V01.xlsx"
 
 try:
     # -------------------------------------------------------
-    # LECTURA DE EXCEL
+    # LECTURA DEL ARCHIVO EXCEL
     # -------------------------------------------------------
 
     df = pd.read_excel(
@@ -296,7 +296,11 @@ try:
     if "Fechas" in df.columns:
         df = df.dropna(subset=["Fechas", "Lts"], how="all")
 
-    df["Lts"] = pd.to_numeric(df["Lts"], errors="coerce")
+    df["Lts"] = pd.to_numeric(
+        df["Lts"],
+        errors="coerce"
+    )
+
     df = df[df["Lts"].notna()]
     df = df[df["Lts"] > 0]
 
@@ -417,7 +421,7 @@ try:
         ]
 
     # -------------------------------------------------------
-    # INDICADORES
+    # INDICADORES PRINCIPALES
     # -------------------------------------------------------
 
     st.markdown(
@@ -434,8 +438,6 @@ try:
         else 0
     )
 
-    # Promedio mensual de consumo:
-    # calcula el consumo total de cada periodo y luego obtiene su promedio
     consumo_por_mes = (
         df_filtrado
         .groupby("Periodo")["Lts"]
@@ -487,8 +489,12 @@ try:
         st.markdown(
             f"""
             <div class="card">
-                <div class="card-title">Promedio mensual de consumo diesel</div>
-                <div class="card-value">{promedio_mensual_consumo:,.0f} L</div>
+                <div class="card-title">
+                    Promedio mensual de consumo diesel
+                </div>
+                <div class="card-value">
+                    {promedio_mensual_consumo:,.0f} L
+                </div>
             </div>
             """,
             unsafe_allow_html=True
@@ -514,7 +520,7 @@ try:
     )
 
     # -------------------------------------------------------
-    # GRAFICOS
+    # ANALISIS GRAFICO
     # -------------------------------------------------------
 
     st.markdown(
@@ -569,7 +575,10 @@ try:
         fig_anual.update_xaxes(
             tickmode="array",
             tickvals=años_grafico,
-            ticktext=[str(año) for año in años_grafico]
+            ticktext=[
+                str(año)
+                for año in años_grafico
+            ]
         )
 
         fig_anual.update_coloraxes(
@@ -768,111 +777,6 @@ try:
         )
 
         # ---------------------------------------------------
-        # RANKING EQUIPO / OPERADOR
-        # ---------------------------------------------------
-
-        st.markdown(
-            '<div class="section-title">🏆 Ranking de consumo</div>',
-            unsafe_allow_html=True
-        )
-
-        colb1, colb2 = st.columns(2)
-
-        with colb1:
-            if "Equipo" in df_filtrado.columns:
-                consumo_equipo = (
-                    df_filtrado
-                    .groupby("Equipo")["Lts"]
-                    .sum()
-                    .reset_index()
-                    .sort_values(
-                        "Lts",
-                        ascending=True
-                    )
-                )
-
-                fig_equipo = px.bar(
-                    consumo_equipo,
-                    x="Lts",
-                    y="Equipo",
-                    orientation="h",
-                    text="Lts",
-                    title="Ranking de consumo por equipo",
-                    color="Lts",
-                    color_continuous_scale="Oranges",
-                    template=template_dark
-                )
-
-                fig_equipo.update_traces(
-                    texttemplate="%{text:,.0f} L",
-                    textposition="outside"
-                )
-
-                fig_equipo.update_layout(
-                    height=520,
-                    xaxis_title="Litros",
-                    yaxis_title="Equipo",
-                    showlegend=False,
-                    **grafico_layout
-                )
-
-                fig_equipo.update_coloraxes(
-                    colorbar_title="Litros"
-                )
-
-                st.plotly_chart(
-                    fig_equipo,
-                    use_container_width=True
-                )
-
-        with colb2:
-            if "Operador" in df_filtrado.columns:
-                consumo_operador = (
-                    df_filtrado
-                    .groupby("Operador")["Lts"]
-                    .sum()
-                    .reset_index()
-                    .sort_values(
-                        "Lts",
-                        ascending=True
-                    )
-                )
-
-                fig_operador = px.bar(
-                    consumo_operador,
-                    x="Lts",
-                    y="Operador",
-                    orientation="h",
-                    text="Lts",
-                    title="Ranking de consumo por operador",
-                    color="Lts",
-                    color_continuous_scale="Blues",
-                    template=template_dark
-                )
-
-                fig_operador.update_traces(
-                    texttemplate="%{text:,.0f} L",
-                    textposition="outside"
-                )
-
-                fig_operador.update_layout(
-                    height=520,
-                    xaxis_title="Litros",
-                    yaxis_title="Operador",
-                    showlegend=False,
-                    **grafico_layout
-                )
-
-                fig_operador.update_coloraxes(
-                    colorbar_title="Litros"
-                )
-
-                st.plotly_chart(
-                    fig_operador,
-                    use_container_width=True
-                )
-
-        # ---------------------------------------------------
         # CONSUMO MENSUAL POR AÑO
         # ---------------------------------------------------
 
@@ -934,16 +838,16 @@ try:
         )
 
         # ---------------------------------------------------
-        # RESUMEN ANUAL POR EQUIPO
+        # RESUMEN DE CONSUMO
         # ---------------------------------------------------
 
         st.markdown(
-            '<div class="section-title">📅 Resumen anual de consumo por equipo</div>',
+            '<div class="section-title">📅 Resumen de consumo</div>',
             unsafe_allow_html=True
         )
 
         if "Equipo" in df_filtrado.columns:
-            resumen_anual_equipo = df_filtrado.pivot_table(
+            resumen_equipo = df_filtrado.pivot_table(
                 index="Equipo",
                 columns="Año",
                 values="Lts",
@@ -952,7 +856,7 @@ try:
             )
 
             st.dataframe(
-                resumen_anual_equipo,
+                resumen_equipo,
                 use_container_width=True
             )
 
