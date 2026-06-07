@@ -1,1678 +1,2573 @@
-import streamlit as st
-import pandas as pd
-import plotly.express as px
 import base64
+import hmac
+import mimetypes
 from pathlib import Path
 
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import plotly.io as pio
+import streamlit as st
 
-# =====================================================
+# ============================================================
 # CONFIGURACION GENERAL
-# =====================================================
-
+# ============================================================
 st.set_page_config(
-    page_title="Analisis Diesel SERFOCOL",
-    page_icon="⛽",
+    page_title="ANALISIS DE INSUMOS CONTRATO MULCHEN",
+    page_icon="📊",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
+)
+
+pio.templates.default = "plotly_dark"
+px.defaults.template = "plotly_dark"
+
+ARCHIVO_EXCEL = "Control_Insumos.xlsx"
+HOJA_DATOS = "Fact_Solped_PBI"
+
+LOGO_SUPERIOR = "logo1.png"
+SELLO_AGUA = "logoredondo.png"
+
+# La fotografia debe comenzar por la palabra selfie.
+# Ejemplos:
+# selfie.png
+# selfie.jpg
+# selfie_ricardo.png
+NOMBRE_INICIAL_SELFIE = "selfie"
+
+# Se utiliza internamente, pero no se muestra en los filtros.
+TIPO_FIJO = "Gasto"
+
+PRESUPUESTO_MENSUAL = 3_728_742
+PRESUPUESTO_ANUAL = PRESUPUESTO_MENSUAL * 12
+
+GASTO_ANUAL_ROPA_TRABAJO = 9_000_000
+GASTO_MENSUAL_ROPA_TRABAJO = (
+    GASTO_ANUAL_ROPA_TRABAJO / 12
 )
 
 
-# =====================================================
-# RUTAS DEL PROYECTO
-# =====================================================
+# ============================================================
+# FUNCIONES GENERALES
+# ============================================================
+def imagen_base64(ruta):
+    ruta = Path(ruta)
 
-BASE_DIR = Path(__file__).resolve().parent
+    if not ruta.exists():
+        return None
 
-archivo_excel = BASE_DIR / "DIESEL SERFOCOL- V01.xlsx"
+    contenido = base64.b64encode(
+        ruta.read_bytes()
+    ).decode("utf-8")
+
+    tipo_mime, _ = mimetypes.guess_type(
+        ruta.name
+    )
+
+    tipo_mime = tipo_mime or "image/png"
+
+    return (
+        f"data:{tipo_mime};"
+        f"base64,{contenido}"
+    )
 
 
-# =====================================================
-# FUNCIONES PARA BUSCAR Y CARGAR IMAGENES
-# =====================================================
-
-def buscar_imagen(nombre_base):
-    """
-    Busca automaticamente una imagen dentro de la misma
-    carpeta donde se encuentra app.py.
-
-    Reconoce variantes como:
-    selfie.jpeg
-    selfie.jpg
-    selfie.PNG
-    selfie nueva.jpeg
-    """
-
+def buscar_imagen_selfie():
     extensiones_validas = {
         ".png",
         ".jpg",
         ".jpeg",
-        ".webp"
+        ".webp",
     }
 
-    for ruta in BASE_DIR.iterdir():
-        if not ruta.is_file():
-            continue
+    archivos = sorted(
+        archivo
+        for archivo in Path(".").glob(
+            f"{NOMBRE_INICIAL_SELFIE}*"
+        )
+        if archivo.is_file()
+        and archivo.suffix.lower()
+        in extensiones_validas
+    )
 
-        nombre_archivo = ruta.stem.lower().strip()
-        extension = ruta.suffix.lower().strip()
-
-        if (
-            nombre_archivo.startswith(
-                nombre_base.lower()
-            )
-            and extension in extensiones_validas
-        ):
-            return ruta
-
-    return None
+    return archivos[0] if archivos else None
 
 
-def convertir_imagen_base64(ruta_imagen):
+def obtener_usuarios_autorizados():
     """
-    Convierte una imagen a Base64 para insertarla
-    directamente dentro del HTML.
-    """
+    Lee los usuarios y claves desde Streamlit Secrets.
 
-    if ruta_imagen and ruta_imagen.exists():
-        with open(
-            ruta_imagen,
-            "rb"
-        ) as imagen:
-            return base64.b64encode(
-                imagen.read()
-            ).decode()
+    Formato esperado:
 
-    return None
-
-
-def obtener_mime(ruta_imagen):
-    """
-    Detecta el formato de la imagen.
+    [usuarios]
+    ricardo = "ClaveSegura"
+    supervisor = "OtraClave"
     """
 
-    if not ruta_imagen:
-        return "image/jpeg"
-
-    extension = ruta_imagen.suffix.lower()
-
-    if extension == ".png":
-        return "image/png"
-
-    if extension == ".webp":
-        return "image/webp"
-
-    return "image/jpeg"
-
-
-# =====================================================
-# CARGAR IMAGENES
-# =====================================================
-
-ruta_selfie = buscar_imagen(
-    "selfie"
-)
-
-ruta_logo_superior = buscar_imagen(
-    "logo1"
-)
-
-ruta_sello_agua = buscar_imagen(
-    "logoredondo"
-)
-
-selfie_base64 = convertir_imagen_base64(
-    ruta_selfie
-)
-
-logo_superior = convertir_imagen_base64(
-    ruta_logo_superior
-)
-
-sello_agua = convertir_imagen_base64(
-    ruta_sello_agua
-)
-
-selfie_mime = obtener_mime(
-    ruta_selfie
-)
-
-logo_mime = obtener_mime(
-    ruta_logo_superior
-)
-
-sello_mime = obtener_mime(
-    ruta_sello_agua
-)
-
-
-# =====================================================
-# ESTILO GENERAL DE STREAMLIT
-# =====================================================
-
-st.markdown(
-    """
-    <style>
-
-        /* =============================================
-           OCULTAR BARRA SUPERIOR DE STREAMLIT
-        ============================================= */
-
-        header[data-testid="stHeader"] {
-            display: none !important;
+    try:
+        return {
+            str(usuario).strip(): str(clave)
+            for usuario, clave
+            in st.secrets["usuarios"].items()
         }
 
-        div[data-testid="stToolbar"] {
-            display: none !important;
-        }
-
-        div[data-testid="stDecoration"] {
-            display: none !important;
-        }
-
-        div[data-testid="stStatusWidget"] {
-            display: none !important;
-        }
-
-        button[data-testid="stBaseButton-headerNoPadding"] {
-            display: none !important;
-        }
-
-        #MainMenu {
-            visibility: hidden !important;
-        }
-
-        footer {
-            visibility: hidden !important;
-        }
-
-        /* =============================================
-           OCULTAR COMPLETAMENTE LA BARRA LATERAL
-        ============================================= */
-
-        section[data-testid="stSidebar"] {
-            display: none !important;
-        }
-
-        button[data-testid="stSidebarCollapseButton"] {
-            display: none !important;
-        }
-
-        div[data-testid="collapsedControl"] {
-            display: none !important;
-        }
-
-        /* =============================================
-           FONDO GENERAL
-        ============================================= */
-
-        .stApp {
-            background-color: #0f172a;
-            color: #e5e7eb;
-        }
-
-        .main {
-            background-color: #0f172a;
-        }
-
-        .block-container {
-            position: relative;
-            z-index: 2;
-            padding-top: 1.3rem;
-            padding-bottom: 1.5rem;
-        }
-
-        /* =============================================
-           TITULOS DEL PANEL
-        ============================================= */
-
-        .titulo-principal {
-            font-size: 42px;
-            font-weight: 900;
-            color: #f8fafc;
-            margin-bottom: 8px;
-            line-height: 1.15;
-        }
-
-        .subtitulo {
-            font-size: 18px;
-            color: #cbd5e1;
-            margin-bottom: 25px;
-            line-height: 1.4;
-        }
-
-        .section-title {
-            font-size: 25px;
-            font-weight: 800;
-            color: #f8fafc;
-            margin-top: 35px;
-            margin-bottom: 15px;
-            border-left: 6px solid #f59e0b;
-            padding-left: 12px;
-        }
-
-        /* =============================================
-           TARJETAS DE INDICADORES
-        ============================================= */
-
-        .card {
-            background: linear-gradient(
-                135deg,
-                #1e293b,
-                #111827
-            );
-            padding: 22px;
-            border-radius: 18px;
-            box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.45);
-            text-align: center;
-            border: 1px solid #334155;
-            min-height: 118px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .card-title {
-            font-size: 15px;
-            color: #cbd5e1;
-            font-weight: 600;
-            line-height: 1.25;
-        }
-
-        .card-value {
-            font-size: 31px;
-            color: #f59e0b;
-            font-weight: 900;
-            margin-top: 8px;
-        }
-
-        /* =============================================
-           TABLAS Y TEXTOS
-        ============================================= */
-
-        div[data-testid="stDataFrame"] {
-            background-color: #1e293b;
-            border-radius: 12px;
-        }
-
-        .stSelectbox label,
-        .stMultiSelect label,
-        .stDateInput label,
-        .stNumberInput label,
-        div[data-testid="stTextInput"] label {
-            color: #e5e7eb !important;
-            font-weight: 700 !important;
-        }
-
-        h1,
-        h2,
-        h3,
-        h4,
-        h5,
-        h6,
-        p,
-        label {
-            color: #e5e7eb;
-        }
-
-        /* =============================================
-           FILTROS
-        ============================================= */
-
-        div[data-baseweb="select"] > div {
-            background-color: #f8fafc !important;
-            color: #0f172a !important;
-            border-radius: 10px !important;
-            border: 1px solid #cbd5e1 !important;
-        }
-
-        div[data-baseweb="select"] span {
-            color: #0f172a !important;
-        }
-
-        div[data-baseweb="select"] input {
-            color: #0f172a !important;
-            background-color: #f8fafc !important;
-        }
-
-        div[role="option"] {
-            background-color: #f8fafc !important;
-            color: #0f172a !important;
-        }
-
-        div[role="option"] * {
-            color: #0f172a !important;
-        }
-
-        div[role="option"]:hover {
-            background-color: #e2e8f0 !important;
-        }
-
-        input {
-            background-color: #f8fafc !important;
-            color: #0f172a !important;
-            border-radius: 8px !important;
-        }
-
-        /* =============================================
-           LOGO SUPERIOR
-        ============================================= */
-
-        .logo-header {
-            display: flex;
-            justify-content: flex-end;
-            align-items: flex-start;
-            width: 100%;
-            padding-top: 5px;
-        }
-
-        .logo-header img {
-            width: 190px;
-            max-width: 100%;
-            height: auto;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 6px;
-            border-radius: 10px;
-            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.35);
-        }
-
-        /* =============================================
-           SELLO DE AGUA
-        ============================================= */
-
-        .sello-agua {
-            position: fixed;
-            top: 52%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 0;
-            opacity: 0.07;
-            pointer-events: none;
-        }
-
-        .sello-agua img {
-            width: 620px;
-            max-width: 75vw;
-            height: auto;
-        }
-
-        /* =============================================
-           PIE DE PAGINA DEL PANEL
-        ============================================= */
-
-        .footer-panel {
-            width: 100%;
-            margin-top: 65px;
-            padding: 24px 10px 12px 10px;
-            border-top: 1px solid rgba(148, 163, 184, 0.28);
-            text-align: center;
-            color: #94a3b8;
-            font-size: 14px;
-            line-height: 1.7;
-        }
-
-        .footer-panel strong {
-            color: #e2e8f0;
-            font-size: 15px;
-        }
-
-        /* =============================================
-           FOTO SUPERIOR DE LA PANTALLA DE ACCESO
-        ============================================= */
-
-        .login-photo-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 175px;
-            height: 175px;
-            margin: 28px auto 18px auto;
-            border-radius: 50%;
-            overflow: hidden;
-            border: 4px solid #f59e0b;
-            background-color: #d1d5db;
-            box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.42);
-        }
-
-        .login-photo {
-            width: 100%;
-            height: 100%;
-            display: block;
-            object-fit: cover;
-            object-position: center 46%;
-            transform: scale(1.34);
-            transform-origin: center center;
-            background-color: #d1d5db;
-        }
-
-        /* =============================================
-           PANTALLA DE ACCESO
-        ============================================= */
-
-        .login-title {
-            text-align: center;
-            color: #f8fafc;
-            font-size: 42px;
-            font-weight: 900;
-            margin-top: 6px;
-            margin-bottom: 8px;
-        }
-
-        .login-subtitle {
-            text-align: center;
-            color: #cbd5e1;
-            font-size: 17px;
-            margin-bottom: 25px;
-        }
-
-        .login-footer {
-            text-align: center;
-            margin-top: 34px;
-            padding-top: 18px;
-            border-top: 1px solid rgba(148, 163, 184, 0.30);
-            color: #94a3b8;
-            font-size: 13px;
-            line-height: 1.7;
-        }
-
-        .login-footer strong {
-            color: #e2e8f0;
-            font-size: 14px;
-        }
-
-        div[data-testid="stButton"] > button[kind="primary"] {
-            background-color: #ef4444 !important;
-            border: none !important;
-            border-radius: 8px !important;
-            color: #ffffff !important;
-            font-weight: 800 !important;
-        }
-
-        div[data-testid="stButton"] > button[kind="primary"]:hover {
-            background-color: #dc2626 !important;
-            color: #ffffff !important;
-        }
-
-        /* =============================================
-           AJUSTES PARA CELULARES
-        ============================================= */
-
-        @media (max-width: 900px) {
-            .login-photo-wrapper {
-                width: 145px;
-                height: 145px;
-                margin-top: 20px;
-            }
-
-            .login-photo {
-                object-position: center 46%;
-                transform: scale(1.34);
-            }
-
-            .login-title {
-                font-size: 34px;
-            }
-
-            .login-subtitle {
-                font-size: 15px;
-            }
-
-            .titulo-principal {
-                font-size: 34px;
-            }
-        }
-
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+    except Exception:
+        return {}
 
 
-# =====================================================
-# ACCESO RESTRINGIDO
-# =====================================================
+def validar_credenciales(
+    usuario,
+    clave,
+):
+    usuarios = obtener_usuarios_autorizados()
 
-def validar_acceso():
-    """
-    Permite visualizar el panel solamente despues
-    de validar el usuario y la contrasena registrados
-    dentro de Streamlit Secrets.
-    """
+    usuario = str(usuario).strip()
+    clave = str(clave)
 
-    if st.session_state.get(
-        "autenticado",
-        False
+    if not usuarios:
+        return (
+            False,
+            "No existen usuarios configurados. "
+            "Revise Streamlit Secrets.",
+        )
+
+    if usuario not in usuarios:
+        return (
+            False,
+            "Usuario o contraseña incorrectos.",
+        )
+
+    if not hmac.compare_digest(
+        clave,
+        usuarios[usuario],
     ):
-        return True
-
-    columna_izquierda, columna_login, columna_derecha = st.columns(
-        [1, 1.2, 1]
-    )
-
-    with columna_login:
-
-        # -----------------------------------------------
-        # FOTOGRAFIA SUPERIOR
-        # -----------------------------------------------
-
-        if selfie_base64:
-            st.markdown(
-                f"""
-                <div class="login-photo-wrapper">
-                    <img
-                        src="data:{selfie_mime};base64,{selfie_base64}"
-                        class="login-photo"
-                        alt="Fotografia"
-                    >
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-        else:
-            st.warning(
-                "No se encontro una fotografia cuyo nombre comience "
-                "por 'selfie' dentro de la misma carpeta de app.py."
-            )
-
-        # -----------------------------------------------
-        # TITULO DEL ACCESO
-        # -----------------------------------------------
-
-        st.markdown(
-            """
-            <div class="login-title">
-                🔐 Acceso restringido
-            </div>
-
-            <div class="login-subtitle">
-                Ingresa tu usuario y contrasena para visualizar el panel.
-            </div>
-            """,
-            unsafe_allow_html=True
+        return (
+            False,
+            "Usuario o contraseña incorrectos.",
         )
 
-        # -----------------------------------------------
-        # FORMULARIO DE ACCESO
-        # -----------------------------------------------
+    return True, None
 
-        usuario = st.text_input(
-            "Usuario",
-            key="login_usuario"
+
+def formato_clp(valor):
+    try:
+        monto = (
+            "{:,.0f}"
+            .format(float(valor))
+            .replace(",", ".")
         )
 
-        contrasena = st.text_input(
-            "Contrasena",
-            type="password",
-            key="login_contrasena"
+        return f"CLP $ {monto}"
+
+    except Exception:
+        return "CLP $ 0"
+
+
+def formato_clp_html(valor):
+    try:
+        monto = (
+            "{:,.0f}"
+            .format(float(valor))
+            .replace(",", ".")
         )
 
-        boton_ingresar = st.button(
-            "Ingresar",
-            type="primary",
-            use_container_width=True
-        )
+    except Exception:
+        monto = "0"
 
-        if boton_ingresar:
-            try:
-                usuarios_autorizados = st.secrets[
-                    "usuarios"
-                ]
-
-                if (
-                    usuario in usuarios_autorizados
-                    and contrasena
-                    == usuarios_autorizados[usuario]
-                ):
-                    st.session_state[
-                        "autenticado"
-                    ] = True
-
-                    st.session_state[
-                        "usuario"
-                    ] = usuario
-
-                    st.rerun()
-
-                else:
-                    st.error(
-                        "Usuario o contrasena incorrectos."
-                    )
-
-            except Exception:
-                st.error(
-                    "No se encontraron usuarios configurados en Secrets."
-                )
-
-        # -----------------------------------------------
-        # TEXTO INFERIOR CENTRADO
-        # -----------------------------------------------
-
-        st.markdown(
-            """
-            <div class="login-footer">
-                <strong>
-                    Panel desarrollado por Ricardo Grez
-                </strong>
-                <br>
-                Administrador de Contrato | SAIVAM
-                <br>
-                Acceso restringido para usuarios autorizados
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    return False
-
-
-if not validar_acceso():
-    st.stop()
-
-
-# =====================================================
-# SELLO DE AGUA
-# =====================================================
-
-if sello_agua:
-    st.markdown(
-        f"""
-        <div class="sello-agua">
-            <img
-                src="data:{sello_mime};base64,{sello_agua}"
-                alt="Sello de agua"
-            >
-        </div>
-        """,
-        unsafe_allow_html=True
+    return (
+        '<span class="monto-clp">'
+        '<span>CLP &#36;</span>'
+        f'<span>{monto}</span>'
+        '</span>'
     )
 
 
-# =====================================================
-# ENCABEZADO DEL PANEL
-# =====================================================
-
-columna_titulo, columna_logo = st.columns(
-    [5, 1.2]
-)
-
-with columna_titulo:
-    st.markdown(
-        """
-        <div class="titulo-principal">
-            ⛽ Control de Consumo de Diesel SERFOCOL
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        """
-        <div class="subtitulo">
-            Visualizacion consolidada para el seguimiento operacional del
-            consumo de diesel por periodo, descripcion, equipo y operador.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-with columna_logo:
-    if logo_superior:
-        st.markdown(
-            f"""
-            <div class="logo-header">
-                <img
-                    src="data:{logo_mime};base64,{logo_superior}"
-                    alt="Logo"
-                >
-            </div>
-            """,
-            unsafe_allow_html=True
+def formato_porcentaje(valor):
+    try:
+        return (
+            f"{valor:.1%}"
+            .replace(".", ",")
         )
 
+    except Exception:
+        return "0,0%"
 
-# =====================================================
-# LECTURA Y ANALISIS DE LA PLANILLA
-# =====================================================
 
-try:
+def ordenar_meses(lista_meses):
+    orden = {
+        "Enero": 1,
+        "Febrero": 2,
+        "Marzo": 3,
+        "Abril": 4,
+        "Mayo": 5,
+        "Junio": 6,
+        "Julio": 7,
+        "Agosto": 8,
+        "Septiembre": 9,
+        "Setiembre": 9,
+        "Octubre": 10,
+        "Noviembre": 11,
+        "Diciembre": 12,
+    }
 
-    # ---------------------------------------------------
-    # LECTURA DEL ARCHIVO
-    # ---------------------------------------------------
-
-    df = pd.read_excel(
-        archivo_excel,
-        header=8,
-        usecols="A:F"
+    return sorted(
+        lista_meses,
+        key=lambda mes: orden.get(
+            str(mes),
+            99,
+        ),
     )
 
-    # ---------------------------------------------------
-    # LIMPIEZA GENERAL
-    # ---------------------------------------------------
 
-    df.columns = (
-        df.columns
-        .astype(str)
-        .str.strip()
-    )
-
-    df = df.loc[
-        :,
-        ~df.columns.str.contains(
-            "Unnamed"
+def cargar_datos():
+    try:
+        df = pd.read_excel(
+            ARCHIVO_EXCEL,
+            sheet_name=HOJA_DATOS,
         )
+
+    except Exception as error:
+        st.error(
+            "No se pudo cargar el archivo Excel: "
+            f"{error}"
+        )
+
+        st.stop()
+
+    columnas_requeridas = [
+        "Año",
+        "Mes",
+        "Fecha_Mes",
+        "Área",
+        "Monto_CLP",
+        "Tipo",
     ]
 
-    df = df.dropna(
-        how="all"
+    faltantes = [
+        columna
+        for columna in columnas_requeridas
+        if columna not in df.columns
+    ]
+
+    if faltantes:
+        st.error(
+            f"Faltan columnas en la hoja "
+            f"'{HOJA_DATOS}': {faltantes}"
+        )
+
+        st.stop()
+
+    df["Fecha_Mes"] = pd.to_datetime(
+        df["Fecha_Mes"],
+        errors="coerce",
     )
 
-    if "Lts" not in df.columns:
-        st.error(
-            "No se encontro la columna 'Lts'."
-        )
-
-        st.write(
-            "Columnas detectadas:"
-        )
-
-        st.write(
-            list(
-                df.columns
-            )
-        )
-
-        st.stop()
-
-    if "Fechas" not in df.columns:
-        st.error(
-            "No se encontro la columna 'Fechas'."
-        )
-
-        st.write(
-            "Columnas detectadas:"
-        )
-
-        st.write(
-            list(
-                df.columns
-            )
-        )
-
-        st.stop()
+    df["Monto_CLP"] = pd.to_numeric(
+        df["Monto_CLP"],
+        errors="coerce",
+    ).fillna(0)
 
     df = df.dropna(
         subset=[
-            "Fechas",
-            "Lts"
-        ],
-        how="all"
+            "Año",
+            "Mes",
+            "Fecha_Mes",
+            "Área",
+            "Tipo",
+        ]
     )
 
-    df["Lts"] = pd.to_numeric(
-        df["Lts"],
-        errors="coerce"
-    )
+    return df
 
-    df = df[
-        df["Lts"].notna()
-    ]
 
-    df = df[
-        df["Lts"] > 0
-    ]
-
-    df["Fechas"] = pd.to_datetime(
-        df["Fechas"],
-        errors="coerce",
-        dayfirst=True
-    )
-
-    df = df[
-        df["Fechas"].notna()
-    ]
-
-    # ---------------------------------------------------
-    # MESES EN ESPANOL
-    # ---------------------------------------------------
-
-    meses_espanol = {
-        1: "Enero",
-        2: "Febrero",
-        3: "Marzo",
-        4: "Abril",
-        5: "Mayo",
-        6: "Junio",
-        7: "Julio",
-        8: "Agosto",
-        9: "Septiembre",
-        10: "Octubre",
-        11: "Noviembre",
-        12: "Diciembre"
-    }
-
-    orden_meses = list(
-        meses_espanol.values()
-    )
-
-    df["Año"] = (
-        df["Fechas"]
-        .dt
-        .year
-        .astype(int)
-    )
-
-    df["Mes"] = (
-        df["Fechas"]
-        .dt
-        .month
-    )
-
-    df["Mes_Nombre"] = (
-        df["Mes"]
-        .map(
-            meses_espanol
+def evaluar_estado_presupuestario(
+    uso_presupuesto
+):
+    if uso_presupuesto <= 0.85:
+        return (
+            "Dentro de presupuesto",
+            "estado-ok",
+            "Controlado",
         )
-    )
 
-    df["Periodo"] = (
-        df["Fechas"]
-        .dt
-        .strftime(
-            "%Y-%m"
+    if uso_presupuesto <= 1:
+        return (
+            "Alerta presupuestaria",
+            "estado-alerta",
+            "Requiere seguimiento",
         )
+
+    return (
+        "Sobreconsumo",
+        "estado-critico",
+        "Requiere accion correctiva",
     )
 
-    df["Fecha"] = (
-        df["Fechas"]
-        .dt
-        .strftime(
-            "%d-%m-%Y"
+
+def tarjeta_metrica(
+    titulo,
+    valor,
+    subtitulo=None,
+    clase_extra="",
+):
+    subtitulo_html = ""
+
+    if subtitulo:
+        subtitulo_html = (
+            '<div class="metric-subtitle">'
+            f'{subtitulo}'
+            '</div>'
         )
-    )
-
-    # ---------------------------------------------------
-    # FILTROS VISIBLES
-    # ---------------------------------------------------
 
     st.markdown(
-        '<div class="section-title">🔎 Filtros de analisis</div>',
-        unsafe_allow_html=True
+        (
+            f'<div class="metric-card {clase_extra}">'
+            f'<div class="metric-title">{titulo}</div>'
+            f'<div class="metric-value">{valor}</div>'
+            f'{subtitulo_html}'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
     )
 
-    df_filtrado = df.copy()
 
-    columna_filtro_1, columna_filtro_2, columna_filtro_3 = st.columns(
+def aplicar_tema_grafico(
+    fig,
+    altura=470,
+):
+    """
+    Aplica una configuracion visual de alto contraste
+    para que los titulos, ejes y leyendas sean visibles.
+    """
+
+    fig.update_layout(
+        height=altura,
+        title=dict(
+            font=dict(
+                size=22,
+                color="#F8FAFC",
+                family="Arial Black",
+            ),
+            x=0.02,
+            xanchor="left",
+        ),
+        font=dict(
+            color="#F8FAFC",
+            size=14,
+            family="Arial",
+        ),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        legend=dict(
+            title=dict(
+                font=dict(
+                    color="#F8FAFC",
+                    size=14,
+                )
+            ),
+            font=dict(
+                color="#F8FAFC",
+                size=14,
+            ),
+            bgcolor="rgba(0,0,0,0)",
+            bordercolor="rgba(148,163,184,0.30)",
+            borderwidth=1,
+        ),
+        legend_title_text="",
+        margin=dict(
+            l=30,
+            r=30,
+            t=82,
+            b=42,
+        ),
+    )
+
+    fig.update_xaxes(
+        color="#F8FAFC",
+        title_font=dict(
+            color="#F8FAFC",
+            size=15,
+        ),
+        tickfont=dict(
+            color="#E5E7EB",
+            size=13,
+        ),
+        gridcolor="rgba(148,163,184,0.20)",
+        zerolinecolor="rgba(148,163,184,0.30)",
+    )
+
+    fig.update_yaxes(
+        color="#F8FAFC",
+        title_font=dict(
+            color="#F8FAFC",
+            size=15,
+        ),
+        tickfont=dict(
+            color="#E5E7EB",
+            size=13,
+        ),
+        gridcolor="rgba(148,163,184,0.20)",
+        zerolinecolor="rgba(148,163,184,0.30)",
+    )
+
+    return fig
+
+
+def aplicar_formato_eje_clp(
+    fig,
+    df_valores,
+    columna="Monto_CLP",
+    titulo_eje="Monto CLP",
+):
+    if df_valores.empty:
+        return fig
+
+    maximo = df_valores[
+        columna
+    ].abs().max()
+
+    minimo = df_valores[
+        columna
+    ].min()
+
+    if maximo <= 0:
+        tickvals = [0]
+
+    else:
+        tickvals = sorted(
+            set(
+                [
+                    -maximo
+                    if minimo < 0
+                    else 0,
+                    0,
+                    maximo * 0.25,
+                    maximo * 0.50,
+                    maximo * 0.75,
+                    maximo,
+                ]
+            )
+        )
+
+    fig.update_yaxes(
+        title_text=titulo_eje,
+        tickmode="array",
+        tickvals=tickvals,
+        ticktext=[
+            formato_clp(valor)
+            for valor in tickvals
+        ],
+        exponentformat="none",
+        separatethousands=False,
+    )
+
+    return fig
+
+
+# ============================================================
+# CONTROL DE SESION
+# ============================================================
+if "acceso_autorizado" not in st.session_state:
+    st.session_state[
+        "acceso_autorizado"
+    ] = False
+
+
+# ============================================================
+# PANTALLA DE ACCESO RESTRINGIDO
+# ============================================================
+def mostrar_acceso_restringido():
+    selfie = buscar_imagen_selfie()
+
+    selfie_b64 = (
+        imagen_base64(selfie)
+        if selfie
+        else None
+    )
+
+    sello_login_b64 = imagen_base64(
+        SELLO_AGUA
+    )
+
+    marca_agua_css = ""
+
+    if sello_login_b64:
+        marca_agua_css = f"""
+        .stApp::before {{
+            content: "";
+            position: fixed;
+            top: 17%;
+            left: 50%;
+            transform:
+                translateX(-50%);
+            width: 760px;
+            height: 760px;
+            background-image:
+                url("{sello_login_b64}");
+            background-repeat:
+                no-repeat;
+            background-position:
+                center;
+            background-size:
+                contain;
+            opacity: 0.075;
+            z-index: 0;
+            pointer-events: none;
+        }}
+        """
+
+    st.markdown(
+        f"""
+        <style>
+
+        {marca_agua_css}
+
+        html,
+        body,
+        .stApp {{
+            min-height: 100vh;
+            background-color:
+                #10182B !important;
+            color:
+                #FFFFFF !important;
+        }}
+
+        .stApp {{
+            border-top:
+                1px solid
+                rgba(255, 255, 255, 0.95);
+        }}
+
+        header[data-testid="stHeader"],
+        div[data-testid="stToolbar"],
+        div[data-testid="stDecoration"],
+        footer,
+        section[data-testid="stSidebar"],
+        button[data-testid="stSidebarCollapsedControl"] {{
+            display: none !important;
+        }}
+
+        .block-container {{
+            max-width:
+                680px !important;
+            padding-top:
+                0.95rem !important;
+            padding-bottom:
+                0.25rem !important;
+            position: relative;
+            z-index: 1;
+        }}
+
+        .contenedor-avatar {{
+            display: flex;
+            justify-content: center;
+            margin:
+                0 auto 10px auto;
+        }}
+
+        .avatar-circular {{
+            width: 148px;
+            height: 148px;
+            overflow: hidden;
+            background-color: #D8D8D8;
+            border:
+                4px solid #F59E0B;
+            border-radius: 50%;
+            box-shadow:
+                0 2px 8px
+                rgba(0, 0, 0, 0.18);
+        }}
+
+        .avatar-circular img {{
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position:
+                center 46%;
+            transform:
+                scale(1.16);
+        }}
+
+        .avatar-vacio {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 66px;
+        }}
+
+        .titulo-login {{
+            margin: 0;
+            color: #FFFFFF;
+            font-size: 35px;
+            font-weight: 900;
+            line-height: 1.12;
+            letter-spacing: -0.6px;
+            text-align: center;
+        }}
+
+        .subtitulo-login {{
+            margin-top: 10px;
+            margin-bottom: 13px;
+            color: #FFFFFF;
+            font-size: 15px;
+            font-weight: 500;
+            line-height: 1.3;
+            text-align: center;
+        }}
+
+        div[data-testid="stForm"] {{
+            padding: 0 !important;
+            background:
+                transparent !important;
+            border:
+                none !important;
+        }}
+
+        div[data-testid="stWidgetLabel"] p,
+        div[data-testid="stWidgetLabel"] label,
+        label[data-testid="stWidgetLabel"],
+        label[data-testid="stWidgetLabel"] p {{
+            color: #FFFFFF !important;
+            opacity: 1 !important;
+            font-size: 13px !important;
+            font-weight: 700 !important;
+        }}
+
+        div[data-testid="stTextInput"] {{
+            margin-bottom: 0 !important;
+        }}
+
+        div[data-testid="stTextInput"] input {{
+            min-height:
+                39px !important;
+            color:
+                #111827 !important;
+            background-color:
+                #F8FAFC !important;
+            border:
+                1px solid
+                #E5E7EB !important;
+            border-radius:
+                8px !important;
+            caret-color:
+                #111827 !important;
+        }}
+
+        div[data-testid="stTextInput"] input:focus {{
+            border-color:
+                #CBD5E1 !important;
+            box-shadow:
+                none !important;
+        }}
+
+        div[data-testid="stTextInput"] button {{
+            color:
+                #374151 !important;
+        }}
+
+        div[data-testid="stFormSubmitButton"] {{
+            margin-top: 0 !important;
+        }}
+
+        div[data-testid="stFormSubmitButton"] button {{
+            width: 100%;
+            min-height:
+                39px !important;
+            color:
+                #FFFFFF !important;
+            background-color:
+                #F44040 !important;
+            border:
+                1px solid
+                #F44040 !important;
+            border-radius:
+                8px !important;
+            font-size:
+                14px !important;
+            font-weight:
+                700 !important;
+        }}
+
+        div[data-testid="stFormSubmitButton"] button:hover {{
+            color:
+                #FFFFFF !important;
+            background-color:
+                #E93333 !important;
+            border-color:
+                #E93333 !important;
+        }}
+
+        .pie-login {{
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top:
+                1px solid
+                rgba(148, 163, 184, 0.36);
+            text-align: center;
+        }}
+
+        .pie-login-titulo {{
+            color: #FFFFFF;
+            font-size: 13px;
+            font-weight: 800;
+        }}
+
+        .pie-login-subtitulo,
+        .pie-login-restringido {{
+            margin-top: 3px;
+            color: #7FB4F4;
+            font-size: 12px;
+            font-weight: 500;
+        }}
+
+        div[data-testid="stAlert"] {{
+            margin-top: 6px;
+            margin-bottom: 0;
+        }}
+
+        @media (max-width: 768px) {{
+            .block-container {{
+                max-width:
+                    92% !important;
+                padding-top:
+                    0.65rem !important;
+            }}
+
+            .avatar-circular {{
+                width: 132px;
+                height: 132px;
+            }}
+
+            .titulo-login {{
+                font-size: 29px;
+            }}
+
+            .subtitulo-login {{
+                margin-top: 7px;
+                margin-bottom: 10px;
+                font-size: 14px;
+            }}
+
+            .pie-login {{
+                margin-top: 10px;
+                padding-top: 8px;
+            }}
+        }}
+
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if selfie_b64:
+        avatar_html = (
+            '<div class="contenedor-avatar">'
+            '<div class="avatar-circular">'
+            f'<img src="{selfie_b64}" '
+            'alt="Fotografia de acceso">'
+            '</div>'
+            '</div>'
+        )
+
+    else:
+        avatar_html = (
+            '<div class="contenedor-avatar">'
+            '<div class="avatar-circular avatar-vacio">'
+            '👤'
+            '</div>'
+            '</div>'
+        )
+
+    st.markdown(
+        avatar_html,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        (
+            '<div class="titulo-login">'
+            '🔐 Acceso restringido'
+            '</div>'
+            '<div class="subtitulo-login">'
+            'Ingresa tu usuario y contraseña '
+            'para visualizar el panel.'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+    with st.form(
+        "formulario_acceso",
+        clear_on_submit=False,
+    ):
+        usuario = st.text_input(
+            "Usuario",
+            placeholder="",
+        )
+
+        clave = st.text_input(
+            "Contraseña",
+            type="password",
+            placeholder="",
+        )
+
+        ingresar = st.form_submit_button(
+            "Ingresar",
+            use_container_width=True,
+        )
+
+    if ingresar:
+        valido, mensaje = validar_credenciales(
+            usuario,
+            clave,
+        )
+
+        if valido:
+            st.session_state[
+                "acceso_autorizado"
+            ] = True
+
+            st.rerun()
+
+        else:
+            st.error(
+                mensaje
+            )
+
+    pie_login_html = (
+        '<div class="pie-login">'
+        '<div class="pie-login-titulo">'
+        'Panel desarrollado por Ricardo Grez'
+        '</div>'
+        '<div class="pie-login-subtitulo">'
+        'Administrador de Contrato | SAIVAM'
+        '</div>'
+        '<div class="pie-login-restringido">'
+        'Acceso restringido para usuarios autorizados'
+        '</div>'
+        '</div>'
+    )
+
+    st.markdown(
+        pie_login_html,
+        unsafe_allow_html=True,
+    )
+
+    st.stop()
+
+
+if not st.session_state[
+    "acceso_autorizado"
+]:
+    mostrar_acceso_restringido()
+
+
+# ============================================================
+# ESTILOS DEL PANEL PRINCIPAL
+# ============================================================
+sello_b64 = imagen_base64(
+    SELLO_AGUA
+)
+
+sello_css = ""
+
+if sello_b64:
+    sello_css = f"""
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        top: 17%;
+        left: 50%;
+        transform:
+            translateX(-50%);
+        width: 760px;
+        height: 760px;
+        background-image:
+            url("{sello_b64}");
+        background-repeat:
+            no-repeat;
+        background-position:
+            center;
+        background-size:
+            contain;
+        opacity: 0.075;
+        z-index: 0;
+        pointer-events: none;
+    }}
+    """
+
+
+st.markdown(
+    f"""
+    <style>
+
+    {sello_css}
+
+    :root {{
+        --fondo-principal: #25282D;
+        --fondo-secundario: #2B2F34;
+        --borde-suave: #454B53;
+        --texto-principal: #F1F5F9;
+        --texto-secundario: #CBD5E1;
+        --texto-muted: #94A3B8;
+        --acento: #60A5FA;
+    }}
+
+    html {{
+        color-scheme: dark;
+    }}
+
+    body,
+    .stApp {{
+        background-color:
+            var(--fondo-principal) !important;
+        color:
+            var(--texto-principal) !important;
+    }}
+
+    header[data-testid="stHeader"],
+    div[data-testid="stToolbar"],
+    footer,
+    section[data-testid="stSidebar"],
+    button[data-testid="stSidebarCollapsedControl"] {{
+        display: none !important;
+    }}
+
+    .barra-superior {{
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 999999;
+        display: flex;
+        height: 64px;
+        align-items: center;
+        justify-content: center;
+        background:
+            rgba(21, 23, 26, 0.98);
+        border-bottom:
+            1px solid
+            rgba(148, 163, 184, 0.26);
+        box-shadow:
+            0 4px 16px
+            rgba(0, 0, 0, 0.30);
+    }}
+
+    .barra-superior-titulo {{
+        color: #F8FAFC;
+        font-size: 20px;
+        font-weight: 850;
+        letter-spacing: 0.7px;
+        text-align: center;
+    }}
+
+    .block-container {{
+        max-width: 100% !important;
+        padding-top:
+            5.6rem !important;
+        padding-bottom:
+            1.5rem !important;
+        position: relative;
+        z-index: 1;
+    }}
+
+    h1,
+    h2,
+    h3 {{
+        color:
+            var(--texto-principal) !important;
+        font-weight: 800;
+    }}
+
+    hr {{
+        border-color:
+            rgba(148, 163, 184, 0.25);
+    }}
+
+    .texto-intro {{
+        max-width: 980px;
+        color:
+            var(--texto-secundario);
+        font-size: 17px;
+        line-height: 1.55;
+    }}
+
+    .panel-filtros {{
+        margin:
+            6px auto 22px auto;
+        padding:
+            20px 22px 12px;
+        background:
+            rgba(43, 47, 52, 0.96);
+        border:
+            1px solid
+            var(--borde-suave);
+        border-radius: 16px;
+        box-shadow:
+            0 5px 18px
+            rgba(0, 0, 0, 0.18);
+    }}
+
+    .titulo-panel-filtros {{
+        margin-bottom: 4px;
+        color:
+            var(--texto-principal);
+        font-size: 21px;
+        font-weight: 850;
+        text-align: center;
+        letter-spacing: 0.3px;
+    }}
+
+    .subtitulo-panel-filtros {{
+        margin-bottom: 16px;
+        color:
+            var(--texto-secundario);
+        font-size: 14px;
+        font-weight: 600;
+        text-align: center;
+    }}
+
+    .metric-card {{
+        min-height: 112px;
+        margin-bottom: 14px;
+        padding: 18px;
+        background:
+            rgba(49, 53, 59, 0.96);
+        border:
+            1px solid
+            var(--borde-suave);
+        border-radius: 18px;
+        box-shadow:
+            0 5px 18px
+            rgba(0, 0, 0, 0.20);
+    }}
+
+    .metric-title {{
+        margin-bottom: 8px;
+        color:
+            var(--texto-secundario);
+        font-size: 14px;
+        font-weight: 700;
+    }}
+
+    .metric-value {{
+        color:
+            var(--texto-principal);
+        font-size: 27px;
+        font-weight: 850;
+        line-height: 1.15;
+    }}
+
+    .metric-subtitle {{
+        margin-top: 8px;
+        color:
+            var(--texto-muted);
+        font-size: 13px;
+        font-weight: 600;
+    }}
+
+    .monto-clp {{
+        display: inline-flex;
+        gap: 7px;
+        white-space: nowrap;
+        font-weight: 850;
+    }}
+
+    .estado-ok {{
+        border-left:
+            7px solid #22C55E;
+    }}
+
+    .estado-alerta {{
+        border-left:
+            7px solid #F59E0B;
+    }}
+
+    .estado-critico {{
+        border-left:
+            7px solid #EF4444;
+    }}
+
+    .nota-presupuesto,
+    .resumen-ejecutivo {{
+        margin-bottom: 18px;
+        padding:
+            16px 20px;
+        color:
+            var(--texto-secundario);
+        background:
+            rgba(43, 47, 52, 0.96);
+        border:
+            1px solid
+            var(--borde-suave);
+        border-left:
+            5px solid
+            var(--acento);
+        border-radius: 12px;
+        font-size: 15px;
+        line-height: 1.65;
+    }}
+
+    .resumen-ejecutivo {{
+        margin-bottom: 24px;
+        border-left-width: 6px;
+        border-radius: 16px;
+        font-size: 16px;
+    }}
+
+    div[data-testid="stWidgetLabel"] p,
+    div[data-testid="stWidgetLabel"] label,
+    label[data-testid="stWidgetLabel"] p,
+    label[data-testid="stWidgetLabel"] {{
+        color:
+            #F8FAFC !important;
+        opacity:
+            1 !important;
+        font-size:
+            15px !important;
+        font-weight:
+            800 !important;
+    }}
+
+    div[data-baseweb="select"] > div {{
+        color:
+            var(--texto-principal) !important;
+        background-color:
+            var(--fondo-secundario) !important;
+        border-color:
+            var(--borde-suave) !important;
+    }}
+
+    div[data-baseweb="select"] input,
+    div[data-baseweb="select"] svg {{
+        color:
+            #F8FAFC !important;
+        opacity:
+            1 !important;
+    }}
+
+    div[data-baseweb="tag"] {{
+        background-color:
+            #3B82F6 !important;
+    }}
+
+    .footer-panel {{
+        width: 100%;
+        margin-top: 44px;
+        padding:
+            20px 0 14px;
+        border-top:
+            1px solid
+            rgba(148, 163, 184, 0.30);
+        text-align: center;
+    }}
+
+    .footer-title {{
+        color: #F1F5F9;
+        font-size: 15px;
+        font-weight: 750;
+    }}
+
+    .footer-subtitle {{
+        margin-top: 5px;
+        color: #CBD5E1;
+        font-size: 14px;
+        font-weight: 600;
+    }}
+
+    .footer-version {{
+        margin-top: 5px;
+        color: #94A3B8;
+        font-size: 12px;
+    }}
+
+    @media (max-width: 768px) {{
+        .barra-superior {{
+            height: 58px;
+            padding:
+                0 12px;
+        }}
+
+        .barra-superior-titulo {{
+            font-size: 14px;
+            letter-spacing: 0.2px;
+        }}
+
+        .block-container {{
+            padding-top:
+                4.8rem !important;
+        }}
+    }}
+
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# BARRA SUPERIOR FIJA
+# ============================================================
+st.markdown(
+    (
+        '<div class="barra-superior">'
+        '<div class="barra-superior-titulo">'
+        'ANALISIS DE INSUMOS CONTRATO MULCHEN'
+        '</div>'
+        '</div>'
+    ),
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# CARGA Y PREPARACION DE DATOS
+# ============================================================
+df = cargar_datos()
+
+if TIPO_FIJO in df[
+    "Tipo"
+].unique():
+
+    df = df[
+        df["Tipo"] == TIPO_FIJO
+    ].copy()
+
+
+df["Detalle"] = (
+    "Gasto registrado Excel"
+)
+
+meses_base = df[
+    [
+        "Año",
+        "Mes",
+        "Fecha_Mes",
+    ]
+].drop_duplicates().copy()
+
+df_ropa = meses_base.copy()
+
+df_ropa["Área"] = "EPP"
+df_ropa["Tipo"] = TIPO_FIJO
+df_ropa["Monto_CLP"] = (
+    GASTO_MENSUAL_ROPA_TRABAJO
+)
+df_ropa["Detalle"] = (
+    "Ropa de trabajo"
+)
+
+df = pd.concat(
+    [
+        df,
+        df_ropa,
+    ],
+    ignore_index=True,
+)
+
+
+# ============================================================
+# ENCABEZADO PRINCIPAL
+# ============================================================
+col_titulo, col_logo = st.columns(
+    [
+        5,
+        1,
+    ]
+)
+
+with col_titulo:
+    st.subheader(
+        "Panel ejecutivo de seguimiento y control"
+    )
+
+    st.markdown(
+        (
+            '<div class="texto-intro">'
+            'Herramienta de analisis ejecutivo orientada '
+            'al seguimiento y control mensual de los '
+            'insumos asociados al contrato, incorporando '
+            'el gasto de ropa de trabajo dentro del area '
+            'EPP, sin modificar el presupuesto oficial '
+            'asignado.'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+with col_logo:
+    if Path(
+        LOGO_SUPERIOR
+    ).exists():
+
+        st.image(
+            LOGO_SUPERIOR,
+            use_container_width=True,
+        )
+
+    else:
+        st.info(
+            "Agregar logo1.png"
+        )
+
+
+st.divider()
+
+
+# ============================================================
+# FILTROS CENTRADOS
+# ============================================================
+anios = sorted(
+    df["Año"]
+    .dropna()
+    .unique()
+)
+
+meses = ordenar_meses(
+    df["Mes"]
+    .dropna()
+    .unique()
+)
+
+areas = sorted(
+    df["Área"]
+    .dropna()
+    .unique()
+)
+
+col_espacio_izq, col_filtros, col_espacio_der = (
+    st.columns(
+        [
+            1,
+            8,
+            1,
+        ]
+    )
+)
+
+with col_filtros:
+    st.markdown(
+        (
+            '<div class="panel-filtros">'
+            '<div class="titulo-panel-filtros">'
+            'Filtros de analisis'
+            '</div>'
+            '<div class="subtitulo-panel-filtros">'
+            'Seleccione los criterios para actualizar '
+            'los indicadores y graficos'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+    col_f1, col_f2, col_f3 = st.columns(
         3
     )
 
-    with columna_filtro_1:
-        años_seleccionados = st.multiselect(
+    with col_f1:
+        filtro_anio = st.multiselect(
             "Año",
-            sorted(
-                df["Año"]
-                .dropna()
-                .unique()
-            ),
-            placeholder="Seleccionar año"
+            options=anios,
+            default=anios,
         )
 
-        if años_seleccionados:
-            df_filtrado = df_filtrado[
-                df_filtrado["Año"]
-                .isin(
-                    años_seleccionados
-                )
-            ]
-
-    with columna_filtro_2:
-        meses_disponibles = [
-            mes
-            for mes in orden_meses
-            if mes in df[
-                "Mes_Nombre"
-            ]
-            .dropna()
-            .unique()
-        ]
-
-        meses_seleccionados = st.multiselect(
+    with col_f2:
+        filtro_mes = st.multiselect(
             "Mes",
-            meses_disponibles,
-            placeholder="Seleccionar mes"
+            options=meses,
+            default=meses,
         )
 
-        if meses_seleccionados:
-            df_filtrado = df_filtrado[
-                df_filtrado[
-                    "Mes_Nombre"
-                ]
-                .isin(
-                    meses_seleccionados
-                )
-            ]
-
-    with columna_filtro_3:
-        if "Descripción" in df.columns:
-            descripciones_seleccionadas = st.multiselect(
-                "Descripcion",
-                sorted(
-                    df[
-                        "Descripción"
-                    ]
-                    .dropna()
-                    .astype(str)
-                    .unique()
-                ),
-                placeholder="Seleccionar descripcion"
-            )
-
-            if descripciones_seleccionadas:
-                df_filtrado = df_filtrado[
-                    df_filtrado[
-                        "Descripción"
-                    ]
-                    .isin(
-                        descripciones_seleccionadas
-                    )
-                ]
-
-    # ---------------------------------------------------
-    # FILTRO POR RANGO DE FECHAS
-    # ---------------------------------------------------
+    with col_f3:
+        filtro_area = st.multiselect(
+            "Area de gasto",
+            options=areas,
+            default=areas,
+        )
 
     st.markdown(
-        '<div class="section-title">📅 Filtro por rango de fechas</div>',
-        unsafe_allow_html=True
+        "</div>",
+        unsafe_allow_html=True,
     )
 
-    fecha_minima = (
-        df["Fechas"]
-        .min()
-        .date()
-    )
 
-    fecha_maxima = (
-        df["Fechas"]
-        .max()
-        .date()
-    )
+st.divider()
 
-    rango_fechas = st.date_input(
-        "Selecciona rango de fechas",
-        value=(
-            fecha_minima,
-            fecha_maxima
+
+# ============================================================
+# APLICACION DE FILTROS
+# ============================================================
+df_filtrado = df[
+    (
+        df["Año"]
+        .isin(
+            filtro_anio
         )
     )
+    & (
+        df["Mes"]
+        .isin(
+            filtro_mes
+        )
+    )
+    & (
+        df["Área"]
+        .isin(
+            filtro_area
+        )
+    )
+].copy()
 
-    if len(
-        rango_fechas
-    ) == 2:
-        fecha_inicio, fecha_fin = rango_fechas
 
-        df_filtrado = df_filtrado[
-            (
-                df_filtrado[
-                    "Fechas"
-                ]
-                .dt
-                .date
-                >= fecha_inicio
-            )
-            &
-            (
-                df_filtrado[
-                    "Fechas"
-                ]
-                .dt
-                .date
-                <= fecha_fin
-            )
-        ]
-
-    # ---------------------------------------------------
-    # INDICADORES PRINCIPALES
-    # ---------------------------------------------------
-
-    st.markdown(
-        '<div class="section-title">📌 Indicadores principales</div>',
-        unsafe_allow_html=True
+if df_filtrado.empty:
+    st.warning(
+        "No existen datos para los filtros seleccionados."
     )
 
-    total_litros = (
-        df_filtrado[
-            "Lts"
-        ]
-        .sum()
+    st.stop()
+
+
+# ============================================================
+# CALCULOS PRINCIPALES
+# ============================================================
+total_gasto = df_filtrado[
+    "Monto_CLP"
+].sum()
+
+
+gasto_mensual = (
+    df_filtrado
+    .groupby(
+        [
+            "Año",
+            "Mes",
+            "Fecha_Mes",
+        ],
+        as_index=False,
+    )["Monto_CLP"]
+    .sum()
+    .sort_values(
+        "Fecha_Mes"
     )
+)
 
-    total_registros = len(
-        df_filtrado
+
+promedio_mensual = gasto_mensual[
+    "Monto_CLP"
+].mean()
+
+
+gasto_area = (
+    df_filtrado
+    .groupby(
+        "Área",
+        as_index=False,
+    )["Monto_CLP"]
+    .sum()
+    .sort_values(
+        "Monto_CLP",
+        ascending=False,
     )
+)
 
-    promedio_carga = (
-        df_filtrado[
-            "Lts"
-        ]
-        .mean()
-        if total_registros > 0
-        else 0
+
+area_mayor_gasto = gasto_area.iloc[
+    0
+]["Área"]
+
+
+monto_area_mayor = gasto_area.iloc[
+    0
+]["Monto_CLP"]
+
+
+gasto_ropa_periodo = df_filtrado.loc[
+    df_filtrado["Detalle"]
+    == "Ropa de trabajo",
+    "Monto_CLP",
+].sum()
+
+
+gasto_excel_periodo = df_filtrado.loc[
+    df_filtrado["Detalle"]
+    == "Gasto registrado Excel",
+    "Monto_CLP",
+].sum()
+
+
+gasto_epp_total = df_filtrado.loc[
+    df_filtrado["Área"] == "EPP",
+    "Monto_CLP",
+].sum()
+
+
+gasto_epp_excel = df_filtrado.loc[
+    (
+        df_filtrado["Área"] == "EPP"
     )
+    & (
+        df_filtrado["Detalle"]
+        == "Gasto registrado Excel"
+    ),
+    "Monto_CLP",
+].sum()
 
-    consumo_por_mes = (
-        df_filtrado
-        .groupby(
-            "Periodo"
-        )[
-            "Lts"
-        ]
-        .sum()
+
+gasto_epp_ropa = df_filtrado.loc[
+    (
+        df_filtrado["Área"] == "EPP"
     )
+    & (
+        df_filtrado["Detalle"]
+        == "Ropa de trabajo"
+    ),
+    "Monto_CLP",
+].sum()
 
-    promedio_mensual_consumo = (
-        consumo_por_mes.mean()
-        if not consumo_por_mes.empty
-        else 0
-    )
 
-    columna_indicador_1, columna_indicador_2, columna_indicador_3, columna_indicador_4 = st.columns(
-        4
-    )
+participacion_epp = (
+    gasto_epp_total / total_gasto
+    if total_gasto > 0
+    else 0
+)
 
-    with columna_indicador_1:
-        st.markdown(
-            f'<div class="card"><div class="card-title">Total litros consumidos</div><div class="card-value">{total_litros:,.0f} L</div></div>',
-            unsafe_allow_html=True
-        )
 
-    with columna_indicador_2:
-        st.markdown(
-            f'<div class="card"><div class="card-title">Cantidad de registros</div><div class="card-value">{total_registros}</div></div>',
-            unsafe_allow_html=True
-        )
+# ============================================================
+# PRESUPUESTO Y AHORRO
+# ============================================================
+gasto_mensual_ahorro = (
+    gasto_mensual.copy()
+)
 
-    with columna_indicador_3:
-        st.markdown(
-            f'<div class="card"><div class="card-title">Promedio por carga</div><div class="card-value">{promedio_carga:,.1f} L</div></div>',
-            unsafe_allow_html=True
-        )
+gasto_mensual_ahorro[
+    "Presupuesto_Mensual"
+] = PRESUPUESTO_MENSUAL
 
-    with columna_indicador_4:
-        st.markdown(
-            f'<div class="card"><div class="card-title">Promedio mensual de consumo diesel</div><div class="card-value">{promedio_mensual_consumo:,.0f} L</div></div>',
-            unsafe_allow_html=True
-        )
-
-    # ---------------------------------------------------
-    # ANALISIS GRAFICO
-    # ---------------------------------------------------
-
-    st.markdown(
-        '<div class="section-title">📊 Analisis grafico de consumos</div>',
-        unsafe_allow_html=True
-    )
-
-    if df_filtrado.empty:
-        st.warning(
-            "No existen datos para mostrar con los filtros seleccionados."
-        )
-
-    else:
-
-        # -----------------------------------------------
-        # CONSUMO ANUAL
-        # -----------------------------------------------
-
-        consumo_anual = (
-            df_filtrado
-            .groupby(
-                "Año"
-            )[
-                "Lts"
-            ]
-            .sum()
-            .reset_index()
-            .sort_values(
-                "Año"
-            )
-        )
-
-        años_grafico = (
-            consumo_anual[
-                "Año"
-            ]
-            .tolist()
-        )
-
-        grafico_anual = px.bar(
-            consumo_anual,
-            x="Año",
-            y="Lts",
-            text="Lts",
-            title="Consumo anual de diesel",
-            color="Lts",
-            color_continuous_scale="Oranges",
-            template="plotly_dark"
-        )
-
-        grafico_anual.update_traces(
-            texttemplate="%{text:,.0f} L",
-            textposition="outside"
-        )
-
-        grafico_anual.update_layout(
-            height=440,
-            xaxis_title="Año",
-            yaxis_title="Litros",
-            showlegend=False,
-            plot_bgcolor="#111827",
-            paper_bgcolor="#111827",
-            font=dict(
-                color="#e5e7eb"
-            ),
-            title_font=dict(
-                size=24,
-                color="#f8fafc"
-            )
-        )
-
-        grafico_anual.update_xaxes(
-            tickmode="array",
-            tickvals=años_grafico,
-            ticktext=[
-                str(
-                    año
-                )
-                for año in años_grafico
-            ]
-        )
-
-        st.plotly_chart(
-            grafico_anual,
-            use_container_width=True
-        )
-
-        # -----------------------------------------------
-        # TENDENCIA MENSUAL
-        # -----------------------------------------------
-
-        consumo_mensual = (
-            df_filtrado
-            .groupby(
-                [
-                    "Año",
-                    "Mes",
-                    "Mes_Nombre"
-                ]
-            )[
-                "Lts"
-            ]
-            .sum()
-            .reset_index()
-            .sort_values(
-                [
-                    "Año",
-                    "Mes"
-                ]
-            )
-        )
-
-        consumo_mensual[
-            "Mes_Año"
-        ] = (
-            consumo_mensual[
-                "Mes_Nombre"
-            ]
-            + " "
-            + consumo_mensual[
-                "Año"
-            ]
-            .astype(str)
-        )
-
-        grafico_mensual = px.line(
-            consumo_mensual,
-            x="Mes_Año",
-            y="Lts",
-            markers=True,
-            title="Tendencia mensual de consumo",
-            template="plotly_dark"
-        )
-
-        grafico_mensual.update_traces(
-            line=dict(
-                width=4,
-                color="#f59e0b"
-            ),
-            marker=dict(
-                size=10,
-                color="#f97316"
-            )
-        )
-
-        grafico_mensual.update_layout(
-            height=440,
-            xaxis_title="Mes",
-            yaxis_title="Litros",
-            plot_bgcolor="#111827",
-            paper_bgcolor="#111827",
-            font=dict(
-                color="#e5e7eb"
-            ),
-            title_font=dict(
-                size=24,
-                color="#f8fafc"
-            )
-        )
-
-        st.plotly_chart(
-            grafico_mensual,
-            use_container_width=True
-        )
-
-        # -----------------------------------------------
-        # DISTRIBUCION MENSUAL
-        # -----------------------------------------------
-
-        st.markdown(
-            '<div class="section-title">🥧 Distribucion mensual del consumo</div>',
-            unsafe_allow_html=True
-        )
-
-        distribucion_mensual = (
-            df_filtrado
-            .groupby(
-                [
-                    "Mes",
-                    "Mes_Nombre"
-                ]
-            )[
-                "Lts"
-            ]
-            .sum()
-            .reset_index()
-            .sort_values(
-                "Mes"
-            )
-        )
-
-        total_consumo_mensual = (
-            distribucion_mensual[
-                "Lts"
-            ]
-            .sum()
-        )
-
-        distribucion_mensual[
-            "Porcentaje"
-        ] = (
-            distribucion_mensual[
-                "Lts"
-            ]
-            / total_consumo_mensual
-            * 100
-        )
-
-        grafico_distribucion_mensual = px.pie(
-            distribucion_mensual,
-            names="Mes_Nombre",
-            values="Lts",
-            title="Participacion mensual del consumo de diesel",
-            hole=0.55,
-            template="plotly_dark",
-            color_discrete_sequence=px.colors.sequential.Oranges_r
-        )
-
-        grafico_distribucion_mensual.update_traces(
-            textposition="inside",
-            textinfo="percent+label",
-            hovertemplate=(
-                "<b>%{label}</b><br>"
-                "Litros consumidos: %{value:,.0f} L<br>"
-                "Participacion: %{percent}<extra></extra>"
-            ),
-            marker=dict(
-                line=dict(
-                    color="#0f172a",
-                    width=2
-                )
-            )
-        )
-
-        grafico_distribucion_mensual.update_layout(
-            height=580,
-            paper_bgcolor="#111827",
-            plot_bgcolor="#111827",
-            font=dict(
-                color="#e5e7eb"
-            ),
-            title_font=dict(
-                size=24,
-                color="#f8fafc"
-            ),
-            legend_title_text="Mes",
-            legend=dict(
-                orientation="v",
-                yanchor="middle",
-                y=0.5,
-                xanchor="left",
-                x=1.02
-            ),
-            annotations=[
-                dict(
-                    text=f"{total_consumo_mensual:,.0f} L<br>Total",
-                    x=0.5,
-                    y=0.5,
-                    font_size=22,
-                    font_color="#f8fafc",
-                    showarrow=False
-                )
-            ]
-        )
-
-        st.plotly_chart(
-            grafico_distribucion_mensual,
-            use_container_width=True
-        )
-
-        # -----------------------------------------------
-        # TABLA RESUMEN MENSUAL
-        # -----------------------------------------------
-
-        st.markdown(
-            '<div class="section-title">📋 Resumen mensual de participacion</div>',
-            unsafe_allow_html=True
-        )
-
-        tabla_distribucion_mensual = (
-            distribucion_mensual
-            .copy()
-        )
-
-        tabla_distribucion_mensual[
-            "Litros"
-        ] = (
-            tabla_distribucion_mensual[
-                "Lts"
-            ]
-            .round(0)
-            .astype(int)
-        )
-
-        tabla_distribucion_mensual[
-            "Participacion"
-        ] = (
-            tabla_distribucion_mensual[
-                "Porcentaje"
-            ]
-            .round(1)
-            .astype(str)
-            + "%"
-        )
-
-        tabla_distribucion_mensual = (
-            tabla_distribucion_mensual[
-                [
-                    "Mes_Nombre",
-                    "Litros",
-                    "Participacion"
-                ]
-            ]
-            .rename(
-                columns={
-                    "Mes_Nombre": "Mes"
-                }
-            )
-        )
-
-        st.dataframe(
-            tabla_distribucion_mensual,
-            use_container_width=True,
-            hide_index=True
-        )
-
-        # -----------------------------------------------
-        # COMPARATIVO MENSUAL POR AÑO
-        # -----------------------------------------------
-
-        st.markdown(
-            '<div class="section-title">📆 Consumo mensual por año</div>',
-            unsafe_allow_html=True
-        )
-
-        consumo_mes_barra = (
-            df_filtrado
-            .groupby(
-                [
-                    "Año",
-                    "Mes",
-                    "Mes_Nombre"
-                ]
-            )[
-                "Lts"
-            ]
-            .sum()
-            .reset_index()
-            .sort_values(
-                [
-                    "Año",
-                    "Mes"
-                ]
-            )
-        )
-
-        consumo_mes_barra[
-            "Año_Texto"
-        ] = (
-            consumo_mes_barra[
-                "Año"
-            ]
-            .astype(str)
-        )
-
-        grafico_mes_barra = px.bar(
-            consumo_mes_barra,
-            x="Mes_Nombre",
-            y="Lts",
-            color="Año_Texto",
-            barmode="group",
-            text="Lts",
-            title="Comparativo mensual por año",
-            template="plotly_dark",
-            labels={
-                "Año_Texto": "Año",
-                "Mes_Nombre": "Mes",
-                "Lts": "Litros"
-            }
-        )
-
-        grafico_mes_barra.update_traces(
-            texttemplate="%{text:,.0f} L",
-            textposition="outside"
-        )
-
-        grafico_mes_barra.update_layout(
-            height=500,
-            xaxis_title="Mes",
-            yaxis_title="Litros",
-            plot_bgcolor="#111827",
-            paper_bgcolor="#111827",
-            font=dict(
-                color="#e5e7eb"
-            ),
-            title_font=dict(
-                size=24,
-                color="#f8fafc"
-            ),
-            legend_title_text="Año"
-        )
-
-        st.plotly_chart(
-            grafico_mes_barra,
-            use_container_width=True
-        )
-
-        # -----------------------------------------------
-        # RESUMEN POR EQUIPO
-        # -----------------------------------------------
-
-        st.markdown(
-            '<div class="section-title">📅 Resumen de consumo por equipo</div>',
-            unsafe_allow_html=True
-        )
-
-        if "Equipo" in df_filtrado.columns:
-            resumen_equipo = (
-                df_filtrado
-                .pivot_table(
-                    index="Equipo",
-                    columns="Año",
-                    values="Lts",
-                    aggfunc="sum",
-                    fill_value=0
-                )
-            )
-
-            st.dataframe(
-                resumen_equipo,
-                use_container_width=True
-            )
-
-        else:
-            st.info(
-                "No se encontro la columna 'Equipo' en la planilla."
-            )
-
-    # ---------------------------------------------------
-    # TABLA GENERAL
-    # ---------------------------------------------------
-
-    st.markdown(
-        '<div class="section-title">📋 Registro general de diesel</div>',
-        unsafe_allow_html=True
-    )
-
-    columnas_mostrar = [
-        "Fecha",
-        "Descripción",
-        "Operador",
-        "Equipo",
-        "N° Salida Existencia",
-        "Lts",
-        "Año",
-        "Mes_Nombre",
-        "Periodo"
+gasto_mensual_ahorro[
+    "Ahorro_Mensual"
+] = (
+    gasto_mensual_ahorro[
+        "Presupuesto_Mensual"
     ]
-
-    columnas_mostrar = [
-        columna
-        for columna in columnas_mostrar
-        if columna in df_filtrado.columns
+    - gasto_mensual_ahorro[
+        "Monto_CLP"
     ]
+)
 
-    tabla_mostrar = (
-        df_filtrado[
-            columnas_mostrar
-        ]
-        .copy()
-    )
-
-    st.dataframe(
-        tabla_mostrar,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # ---------------------------------------------------
-    # ALERTAS
-    # ---------------------------------------------------
-
-    st.markdown(
-        '<div class="section-title">🚨 Alertas de control</div>',
-        unsafe_allow_html=True
-    )
-
-    limite_litros = st.number_input(
-        "Definir limite de litros por carga",
-        min_value=0,
-        value=50,
-        step=1
-    )
-
-    alertas = df_filtrado[
-        df_filtrado[
-            "Lts"
-        ] > limite_litros
+gasto_mensual_ahorro[
+    "Desviacion_Mensual"
+] = (
+    gasto_mensual_ahorro[
+        "Monto_CLP"
     ]
+    - gasto_mensual_ahorro[
+        "Presupuesto_Mensual"
+    ]
+)
 
-    if not alertas.empty:
-        st.warning(
-            "Existen cargas que superan el limite definido."
-        )
-
-        alertas_mostrar = (
-            alertas[
-                columnas_mostrar
-            ]
-            .copy()
-        )
-
-        st.dataframe(
-            alertas_mostrar,
-            use_container_width=True,
-            hide_index=True
-        )
-
-    else:
-        st.success(
-            "No existen cargas sobre el limite definido."
-        )
-
-
-# =====================================================
-# MANEJO DE ERRORES
-# =====================================================
-
-except FileNotFoundError:
-    st.error(
-        "No se encontro la planilla Excel."
+gasto_mensual_ahorro[
+    "Estado"
+] = gasto_mensual_ahorro[
+    "Ahorro_Mensual"
+].apply(
+    lambda valor: (
+        "Ahorro"
+        if valor >= 0
+        else "Sobreconsumo"
     )
-
-    st.write(
-        "Verifica que el archivo este en la misma carpeta "
-        "que app.py y que mantenga exactamente este nombre:"
-    )
-
-    st.code(
-        "DIESEL SERFOCOL- V01.xlsx"
-    )
-
-except Exception as error:
-    st.error(
-        "Ocurrio un error al cargar la planilla."
-    )
-
-    st.write(
-        error
-    )
+)
 
 
-# =====================================================
-# PIE DE PAGINA
-# =====================================================
+cantidad_meses = len(
+    gasto_mensual_ahorro
+)
+
+presupuesto_periodo = (
+    PRESUPUESTO_MENSUAL
+    * cantidad_meses
+)
+
+gasto_periodo = gasto_mensual_ahorro[
+    "Monto_CLP"
+].sum()
+
+ahorro_periodo = (
+    presupuesto_periodo
+    - gasto_periodo
+)
+
+ahorro_promedio_mensual = (
+    PRESUPUESTO_MENSUAL
+    - promedio_mensual
+)
+
+proyeccion_ahorro_anual = (
+    ahorro_promedio_mensual
+    * 12
+)
+
+porcentaje_uso_presupuesto = (
+    gasto_periodo
+    / presupuesto_periodo
+    if presupuesto_periodo > 0
+    else 0
+)
+
+porcentaje_ahorro_presupuestario = (
+    ahorro_periodo
+    / presupuesto_periodo
+    if presupuesto_periodo > 0
+    else 0
+)
+
+(
+    estado_presupuesto,
+    clase_estado,
+    subtitulo_estado,
+) = evaluar_estado_presupuestario(
+    porcentaje_uso_presupuesto
+)
+
+
+# ============================================================
+# RESUMEN EJECUTIVO
+# ============================================================
+st.subheader(
+    "Resumen ejecutivo"
+)
 
 st.markdown(
-    """
-    <div class="footer-panel">
-        <strong>
-            Panel desarrollado por Ricardo Grez
-        </strong>
-        <br>
-        Administrador de Contrato | SAIVAM
-        <br>
-        Version 1.0 | Ultima actualizacion: Mayo 2026
-    </div>
-    """,
-    unsafe_allow_html=True
+    (
+        '<div class="resumen-ejecutivo">'
+        'Durante el periodo seleccionado, el gasto '
+        'total considerado alcanzo '
+        f'<b>{formato_clp_html(total_gasto)}</b>, '
+        'frente a un presupuesto oficial de '
+        f'<b>{formato_clp_html(presupuesto_periodo)}</b>. '
+        'Esto representa un uso presupuestario de '
+        f'<b>{formato_porcentaje(porcentaje_uso_presupuesto)}</b> '
+        'y un ahorro presupuestario de '
+        f'<b>{formato_porcentaje(porcentaje_ahorro_presupuestario)}</b>. '
+        'El area con mayor incidencia fue '
+        f'<b>{area_mayor_gasto}</b>, con un monto de '
+        f'<b>{formato_clp_html(monto_area_mayor)}</b>. '
+        'La ropa de trabajo se incorpora dentro del '
+        'area <b>EPP</b>, sin modificar el presupuesto '
+        'oficial asignado.'
+        '</div>'
+    ),
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# INDICADORES PRINCIPALES
+# ============================================================
+st.subheader(
+    "Indicadores principales"
+)
+
+col0, col1, col2, col3 = st.columns(
+    4
+)
+
+with col0:
+    tarjeta_metrica(
+        "Estado presupuestario",
+        estado_presupuesto,
+        subtitulo_estado,
+        clase_estado,
+    )
+
+with col1:
+    tarjeta_metrica(
+        "Gasto total considerado",
+        formato_clp_html(
+            total_gasto
+        ),
+    )
+
+with col2:
+    tarjeta_metrica(
+        "Gasto promedio mensual",
+        formato_clp_html(
+            promedio_mensual
+        ),
+    )
+
+with col3:
+    tarjeta_metrica(
+        "Uso del presupuesto",
+        formato_porcentaje(
+            porcentaje_uso_presupuesto
+        ),
+    )
+
+
+col4, col5, col6, col7 = st.columns(
+    4
+)
+
+with col4:
+    tarjeta_metrica(
+        "Area mayor gasto",
+        area_mayor_gasto,
+    )
+
+with col5:
+    tarjeta_metrica(
+        "Monto area mayor",
+        formato_clp_html(
+            monto_area_mayor
+        ),
+    )
+
+with col6:
+    tarjeta_metrica(
+        "Ahorro acumulado periodo",
+        formato_clp_html(
+            ahorro_periodo
+        ),
+    )
+
+with col7:
+    tarjeta_metrica(
+        "Ahorro presupuestario",
+        formato_porcentaje(
+            porcentaje_ahorro_presupuestario
+        ),
+    )
+
+
+col8, col9, col10, col11 = st.columns(
+    4
+)
+
+with col8:
+    tarjeta_metrica(
+        "Gasto registrado Excel",
+        formato_clp_html(
+            gasto_excel_periodo
+        ),
+    )
+
+with col9:
+    tarjeta_metrica(
+        "Gasto ropa trabajo EPP",
+        formato_clp_html(
+            gasto_ropa_periodo
+        ),
+    )
+
+with col10:
+    tarjeta_metrica(
+        "Presupuesto mensual oficial",
+        formato_clp_html(
+            PRESUPUESTO_MENSUAL
+        ),
+    )
+
+with col11:
+    tarjeta_metrica(
+        "Presupuesto anual oficial",
+        formato_clp_html(
+            PRESUPUESTO_ANUAL
+        ),
+    )
+
+
+# ============================================================
+# ANALISIS PRESUPUESTARIO
+# ============================================================
+st.subheader(
+    "Analisis presupuestario"
+)
+
+st.markdown(
+    (
+        '<div class="nota-presupuesto">'
+        'El presupuesto mensual oficial se mantiene '
+        'en '
+        f'<b>{formato_clp_html(PRESUPUESTO_MENSUAL)}</b>. '
+        'La ropa de trabajo se incorpora como gasto '
+        'dentro del area <b>EPP</b>, por un monto '
+        'mensual de '
+        f'<b>{formato_clp_html(GASTO_MENSUAL_ROPA_TRABAJO)}</b>, '
+        'equivalente a '
+        f'<b>{formato_clp_html(GASTO_ANUAL_ROPA_TRABAJO)}</b> '
+        'anual. Este gasto no aumenta el presupuesto; '
+        'solamente se suma al gasto real considerado.'
+        '</div>'
+    ),
+    unsafe_allow_html=True,
+)
+
+
+col_a1, col_a2, col_a3, col_a4 = st.columns(
+    4
+)
+
+with col_a1:
+    tarjeta_metrica(
+        "Presupuesto periodo filtrado",
+        formato_clp_html(
+            presupuesto_periodo
+        ),
+    )
+
+with col_a2:
+    tarjeta_metrica(
+        "Gasto acumulado periodo",
+        formato_clp_html(
+            gasto_periodo
+        ),
+    )
+
+with col_a3:
+    tarjeta_metrica(
+        "Ahorro promedio mensual",
+        formato_clp_html(
+            ahorro_promedio_mensual
+        ),
+    )
+
+with col_a4:
+    tarjeta_metrica(
+        "Proyeccion ahorro anual",
+        formato_clp_html(
+            proyeccion_ahorro_anual
+        ),
+    )
+
+
+# ============================================================
+# ANALISIS EPP
+# ============================================================
+st.subheader(
+    "Analisis especifico del area EPP"
+)
+
+col_epp1, col_epp2, col_epp3, col_epp4 = (
+    st.columns(
+        4
+    )
+)
+
+with col_epp1:
+    tarjeta_metrica(
+        "Gasto total EPP",
+        formato_clp_html(
+            gasto_epp_total
+        ),
+    )
+
+with col_epp2:
+    tarjeta_metrica(
+        "EPP registrado Excel",
+        formato_clp_html(
+            gasto_epp_excel
+        ),
+    )
+
+with col_epp3:
+    tarjeta_metrica(
+        "Ropa trabajo cargada a EPP",
+        formato_clp_html(
+            gasto_epp_ropa
+        ),
+    )
+
+with col_epp4:
+    tarjeta_metrica(
+        "Participacion EPP",
+        formato_porcentaje(
+            participacion_epp
+        ),
+    )
+
+
+# ============================================================
+# RANKING DE AREAS
+# ============================================================
+st.subheader(
+    "Ranking de areas con mayor gasto"
+)
+
+ranking_area = gasto_area.copy()
+
+ranking_area[
+    "Ranking"
+] = range(
+    1,
+    len(
+        ranking_area
+    )
+    + 1,
+)
+
+ranking_area[
+    "Monto"
+] = ranking_area[
+    "Monto_CLP"
+].apply(
+    formato_clp
+)
+
+ranking_area[
+    "Participacion"
+] = ranking_area[
+    "Monto_CLP"
+].apply(
+    lambda valor: (
+        formato_porcentaje(
+            valor / total_gasto
+        )
+        if total_gasto > 0
+        else "0,0%"
+    )
+)
+
+st.dataframe(
+    ranking_area[
+        [
+            "Ranking",
+            "Área",
+            "Monto",
+            "Participacion",
+        ]
+    ].rename(
+        columns={
+            "Área": "Area",
+        }
+    ),
+    use_container_width=True,
+    hide_index=True,
+)
+
+
+# ============================================================
+# PROMEDIOS POR AREA
+# ============================================================
+st.subheader(
+    "Promedios por area"
+)
+
+promedio_area_base = (
+    df_filtrado
+    .groupby(
+        [
+            "Año",
+            "Mes",
+            "Fecha_Mes",
+            "Área",
+        ],
+        as_index=False,
+    )["Monto_CLP"]
+    .sum()
+)
+
+promedio_area = (
+    promedio_area_base
+    .groupby(
+        "Área",
+        as_index=False,
+    )
+    .agg(
+        Gasto_Total=(
+            "Monto_CLP",
+            "sum",
+        ),
+        Promedio_Mensual=(
+            "Monto_CLP",
+            "mean",
+        ),
+        Meses_Con_Registro=(
+            "Monto_CLP",
+            "count",
+        ),
+    )
+    .sort_values(
+        "Gasto_Total",
+        ascending=False,
+    )
+)
+
+promedio_area_mostrar = (
+    promedio_area.copy()
+)
+
+promedio_area_mostrar[
+    "Gasto_Total"
+] = promedio_area_mostrar[
+    "Gasto_Total"
+].apply(
+    formato_clp
+)
+
+promedio_area_mostrar[
+    "Promedio_Mensual"
+] = promedio_area_mostrar[
+    "Promedio_Mensual"
+].apply(
+    formato_clp
+)
+
+st.dataframe(
+    promedio_area_mostrar.rename(
+        columns={
+            "Área": "Area",
+        }
+    ),
+    use_container_width=True,
+    hide_index=True,
+)
+
+
+# ============================================================
+# EVOLUCION MENSUAL
+# ============================================================
+st.subheader(
+    "Evolucion mensual del gasto en insumos"
+)
+
+gasto_mensual[
+    "Monto_Texto"
+] = gasto_mensual[
+    "Monto_CLP"
+].apply(
+    formato_clp
+)
+
+fig_linea = go.Figure()
+
+fig_linea.add_trace(
+    go.Scatter(
+        x=gasto_mensual[
+            "Fecha_Mes"
+        ],
+        y=gasto_mensual[
+            "Monto_CLP"
+        ],
+        mode="lines+markers",
+        name="Gasto considerado",
+        line=dict(
+            width=4,
+            color="#60A5FA",
+        ),
+        marker=dict(
+            size=10,
+            color="#818CF8",
+            line=dict(
+                width=2,
+                color="#FFFFFF",
+            ),
+        ),
+        customdata=gasto_mensual[
+            "Monto_Texto"
+        ],
+        hovertemplate=(
+            "<b>Mes:</b> %{x|%m-%Y}"
+            "<br><b>Gasto:</b> %{customdata}"
+            "<extra></extra>"
+        ),
+    )
+)
+
+fig_linea.add_trace(
+    go.Scatter(
+        x=gasto_mensual[
+            "Fecha_Mes"
+        ],
+        y=[
+            PRESUPUESTO_MENSUAL
+        ]
+        * len(
+            gasto_mensual
+        ),
+        mode="lines",
+        name="Presupuesto oficial mensual",
+        line=dict(
+            width=4,
+            dash="dash",
+            color="#FB654F",
+        ),
+    )
+)
+
+fig_linea.update_layout(
+    title=(
+        "Evolucion mensual del gasto considerado "
+        "versus presupuesto oficial"
+    ),
+    hovermode="x unified",
+    xaxis_title="Mes",
+    yaxis_title="Monto CLP",
+)
+
+fig_linea = aplicar_formato_eje_clp(
+    fig_linea,
+    gasto_mensual,
+)
+
+st.plotly_chart(
+    aplicar_tema_grafico(
+        fig_linea,
+        470,
+    ),
+    use_container_width=True,
+    config={
+        "displayModeBar": False,
+    },
+)
+
+
+# ============================================================
+# COMPARATIVO PRESUPUESTO VS GASTO
+# ============================================================
+st.subheader(
+    "Comparativo mensual: presupuesto versus gasto considerado"
+)
+
+comparativo = (
+    gasto_mensual_ahorro.copy()
+)
+
+comparativo[
+    "Mes_Año"
+] = comparativo[
+    "Fecha_Mes"
+].dt.strftime(
+    "%m-%Y"
+)
+
+comparativo_largo = comparativo.melt(
+    id_vars=[
+        "Mes_Año",
+        "Fecha_Mes",
+    ],
+    value_vars=[
+        "Presupuesto_Mensual",
+        "Monto_CLP",
+    ],
+    var_name="Indicador",
+    value_name="Monto",
+)
+
+comparativo_largo[
+    "Indicador"
+] = comparativo_largo[
+    "Indicador"
+].replace(
+    {
+        "Presupuesto_Mensual":
+            "Presupuesto oficial",
+        "Monto_CLP":
+            "Gasto considerado",
+    }
+)
+
+comparativo_largo[
+    "Monto_Texto"
+] = comparativo_largo[
+    "Monto"
+].apply(
+    formato_clp
+)
+
+fig_comparativo = px.bar(
+    comparativo_largo,
+    x="Mes_Año",
+    y="Monto",
+    color="Indicador",
+    barmode="group",
+    title=(
+        "Presupuesto oficial versus "
+        "gasto considerado"
+    ),
+    text="Monto_Texto",
+    color_discrete_map={
+        "Presupuesto oficial":
+            "#FB654F",
+        "Gasto considerado":
+            "#60A5FA",
+    },
+)
+
+fig_comparativo.update_traces(
+    textposition="outside",
+    textfont=dict(
+        color="#FFFFFF",
+        size=13,
+    ),
+    cliponaxis=False,
+)
+
+fig_comparativo = aplicar_formato_eje_clp(
+    fig_comparativo,
+    comparativo_largo,
+    "Monto",
+)
+
+st.plotly_chart(
+    aplicar_tema_grafico(
+        fig_comparativo,
+        500,
+    ),
+    use_container_width=True,
+    config={
+        "displayModeBar": False,
+    },
+)
+
+
+# ============================================================
+# AHORRO Y SOBRECONSUMO
+# ============================================================
+st.subheader(
+    "Ahorro, sobreconsumo y desviacion mensual"
+)
+
+gasto_mensual_ahorro[
+    "Mes_Año"
+] = gasto_mensual_ahorro[
+    "Fecha_Mes"
+].dt.strftime(
+    "%m-%Y"
+)
+
+gasto_mensual_ahorro[
+    "Ahorro_Texto"
+] = gasto_mensual_ahorro[
+    "Ahorro_Mensual"
+].apply(
+    formato_clp
+)
+
+fig_ahorro = px.bar(
+    gasto_mensual_ahorro,
+    x="Mes_Año",
+    y="Ahorro_Mensual",
+    color="Estado",
+    title=(
+        "Resultado mensual frente al "
+        "presupuesto oficial"
+    ),
+    text="Ahorro_Texto",
+    color_discrete_map={
+        "Ahorro":
+            "#22C55E",
+        "Sobreconsumo":
+            "#EF4444",
+    },
+)
+
+fig_ahorro.update_traces(
+    textposition="outside",
+    textfont=dict(
+        color="#FFFFFF",
+        size=13,
+    ),
+    cliponaxis=False,
+)
+
+fig_ahorro = aplicar_formato_eje_clp(
+    fig_ahorro,
+    gasto_mensual_ahorro,
+    "Ahorro_Mensual",
+    "Ahorro / Sobreconsumo CLP",
+)
+
+st.plotly_chart(
+    aplicar_tema_grafico(
+        fig_ahorro,
+        500,
+    ),
+    use_container_width=True,
+    config={
+        "displayModeBar": False,
+    },
+)
+
+
+# ============================================================
+# COMPOSICION DEL GASTO
+# ============================================================
+st.subheader(
+    "Composicion del gasto considerado"
+)
+
+composicion = pd.DataFrame(
+    {
+        "Origen del gasto": [
+            "Gasto registrado Excel",
+            "Ropa de trabajo cargada a EPP",
+        ],
+        "Monto_CLP": [
+            gasto_excel_periodo,
+            gasto_ropa_periodo,
+        ],
+    }
+)
+
+fig_composicion = px.pie(
+    composicion,
+    names="Origen del gasto",
+    values="Monto_CLP",
+    title=(
+        "Distribucion gasto registrado "
+        "Excel versus ropa de trabajo"
+    ),
+    hole=0.45,
+)
+
+fig_composicion.update_traces(
+    textposition="inside",
+    textinfo="percent+label",
+    textfont=dict(
+        color="#FFFFFF",
+        size=15,
+    ),
+)
+
+st.plotly_chart(
+    aplicar_tema_grafico(
+        fig_composicion,
+        500,
+    ),
+    use_container_width=True,
+    config={
+        "displayModeBar": False,
+    },
+)
+
+
+# ============================================================
+# ANALISIS POR AREA
+# ============================================================
+st.subheader(
+    "Analisis por area"
+)
+
+col_g1, col_g2 = st.columns(
+    2
+)
+
+gasto_area[
+    "Monto_Texto"
+] = gasto_area[
+    "Monto_CLP"
+].apply(
+    formato_clp
+)
+
+
+with col_g1:
+    fig_barra_area = px.bar(
+        gasto_area,
+        x="Área",
+        y="Monto_CLP",
+        title="Gasto total por area",
+        text="Monto_Texto",
+    )
+
+    fig_barra_area.update_traces(
+        textposition="outside",
+        textfont=dict(
+            color="#FFFFFF",
+            size=13,
+        ),
+        marker_color="#60A5FA",
+        cliponaxis=False,
+    )
+
+    fig_barra_area.update_layout(
+        xaxis_tickangle=-35,
+    )
+
+    fig_barra_area = aplicar_formato_eje_clp(
+        fig_barra_area,
+        gasto_area,
+    )
+
+    st.plotly_chart(
+        aplicar_tema_grafico(
+            fig_barra_area,
+            500,
+        ),
+        use_container_width=True,
+        config={
+            "displayModeBar": False,
+        },
+    )
+
+
+with col_g2:
+    fig_torta_area = px.pie(
+        gasto_area,
+        names="Área",
+        values="Monto_CLP",
+        title=(
+            "Distribucion porcentual por area"
+        ),
+        hole=0.45,
+    )
+
+    fig_torta_area.update_traces(
+        textposition="inside",
+        textinfo="percent+label",
+        textfont=dict(
+            color="#FFFFFF",
+            size=14,
+        ),
+    )
+
+    st.plotly_chart(
+        aplicar_tema_grafico(
+            fig_torta_area,
+            500,
+        ),
+        use_container_width=True,
+        config={
+            "displayModeBar": False,
+        },
+    )
+
+
+# ============================================================
+# DETALLE MENSUAL
+# ============================================================
+st.subheader(
+    "Detalle mensual de presupuesto, ahorro y desviacion"
+)
+
+tabla_ahorro = (
+    gasto_mensual_ahorro.copy()
+)
+
+tabla_ahorro[
+    "Presupuesto Oficial"
+] = tabla_ahorro[
+    "Presupuesto_Mensual"
+].apply(
+    formato_clp
+)
+
+tabla_ahorro[
+    "Gasto Considerado"
+] = tabla_ahorro[
+    "Monto_CLP"
+].apply(
+    formato_clp
+)
+
+tabla_ahorro[
+    "Ahorro / Sobreconsumo"
+] = tabla_ahorro[
+    "Ahorro_Mensual"
+].apply(
+    formato_clp
+)
+
+tabla_ahorro[
+    "Desviacion"
+] = tabla_ahorro[
+    "Desviacion_Mensual"
+].apply(
+    formato_clp
+)
+
+st.dataframe(
+    tabla_ahorro[
+        [
+            "Año",
+            "Mes",
+            "Presupuesto Oficial",
+            "Gasto Considerado",
+            "Ahorro / Sobreconsumo",
+            "Desviacion",
+            "Estado",
+        ]
+    ],
+    use_container_width=True,
+    hide_index=True,
+)
+
+
+# ============================================================
+# TABLA CONSOLIDADA
+# ============================================================
+st.subheader(
+    "Tabla consolidada de insumos"
+)
+
+tabla_resumen = (
+    df_filtrado
+    .groupby(
+        [
+            "Año",
+            "Mes",
+            "Área",
+            "Tipo",
+            "Detalle",
+        ],
+        as_index=False,
+    )["Monto_CLP"]
+    .sum()
+    .sort_values(
+        [
+            "Año",
+            "Mes",
+            "Área",
+            "Detalle",
+        ]
+    )
+)
+
+tabla_resumen[
+    "Monto"
+] = tabla_resumen[
+    "Monto_CLP"
+].apply(
+    formato_clp
+)
+
+st.dataframe(
+    tabla_resumen[
+        [
+            "Año",
+            "Mes",
+            "Área",
+            "Tipo",
+            "Detalle",
+            "Monto",
+        ]
+    ].rename(
+        columns={
+            "Área": "Area",
+        }
+    ),
+    use_container_width=True,
+    hide_index=True,
+)
+
+
+# ============================================================
+# PIE DE PAGINA
+# ============================================================
+st.markdown(
+    (
+        '<div class="footer-panel">'
+        '<div class="footer-title">'
+        'Panel desarrollado por Ricardo Grez'
+        '</div>'
+        '<div class="footer-subtitle">'
+        'Administrador de Contrato | SAIVAM'
+        '</div>'
+        '<div class="footer-version">'
+        'Version 1.0 | Ultima actualizacion: Mayo 2026'
+        '</div>'
+        '</div>'
+    ),
+    unsafe_allow_html=True,
 )
