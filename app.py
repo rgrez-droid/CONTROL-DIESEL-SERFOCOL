@@ -26,17 +26,27 @@ def buscar_imagen(nombre_base):
         ruta = Path(f"{nombre_base}{extension}")
         if ruta.exists() and ruta.is_file():
             return ruta
+
     return None
 
 
 def buscar_selfie():
-    extensiones = {".png", ".jpg", ".jpeg", ".webp"}
+    extensiones = {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp",
+    }
+
     archivos = sorted(
         archivo
-        for archivo in Path(".").glob(f"{NOMBRE_INICIAL_SELFIE}*")
+        for archivo in Path(".").glob(
+            f"{NOMBRE_INICIAL_SELFIE}*"
+        )
         if archivo.is_file()
         and archivo.suffix.lower() in extensiones
     )
+
     return archivos[0] if archivos else None
 
 
@@ -46,7 +56,9 @@ def data_uri(ruta):
 
     contenido = base64.b64encode(
         ruta.read_bytes()
-    ).decode("utf-8")
+    ).decode(
+        "utf-8"
+    )
 
     tipo_mime, _ = mimetypes.guess_type(
         ruta.name
@@ -211,8 +223,10 @@ def css_sello():
         left: 50%;
         transform:
             translateX(-50%);
-        width: 760px;
-        height: 760px;
+        width:
+            760px;
+        height:
+            760px;
         background-image:
             url("{sello}");
         background-repeat:
@@ -221,8 +235,10 @@ def css_sello():
             center;
         background-size:
             contain;
-        opacity: 0.075;
-        z-index: 0;
+        opacity:
+            0.075;
+        z-index:
+            0;
         pointer-events:
             none;
     }}
@@ -1333,11 +1349,37 @@ try:
             plot_bgcolor="#111827",
             paper_bgcolor="#111827",
             font=dict(
-                color="#E5E7EB"
+                color="#F8FAFC",
+                size=15,
             ),
             title_font=dict(
                 size=24,
-                color="#F8FAFC",
+                color="#FFFFFF",
+            ),
+            legend=dict(
+                font=dict(
+                    size=17,
+                    color="#FFFFFF",
+                ),
+                title=dict(
+                    font=dict(
+                        size=18,
+                        color="#F8FAFC",
+                    )
+                ),
+                bgcolor="rgba(15, 23, 42, 0.92)",
+                bordercolor="#64748B",
+                borderwidth=1,
+                x=1.02,
+                xanchor="left",
+                y=1,
+                yanchor="top",
+            ),
+            margin=dict(
+                l=60,
+                r=210,
+                t=80,
+                b=60,
             ),
         )
 
