@@ -11,59 +11,341 @@ from pathlib import Path
 st.set_page_config(
     page_title="Analisis Diesel SERFOCOL",
     page_icon="⛽",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # -------------------------------------------------------
-# ACCESO RESTRINGIDO CON USUARIO Y CONTRASENA
+# ESTILO GENERAL DE STREAMLIT
+# -------------------------------------------------------
+
+st.markdown(
+    """
+    <style>
+
+        /* --------------------------------------------- */
+        /* OCULTAR BARRA SUPERIOR DE STREAMLIT            */
+        /* --------------------------------------------- */
+
+        header[data-testid="stHeader"] {
+            display: none !important;
+        }
+
+        div[data-testid="stToolbar"] {
+            display: none !important;
+        }
+
+        div[data-testid="stDecoration"] {
+            display: none !important;
+        }
+
+        div[data-testid="stStatusWidget"] {
+            display: none !important;
+        }
+
+        #MainMenu {
+            visibility: hidden !important;
+        }
+
+        footer {
+            visibility: hidden !important;
+        }
+
+        /* --------------------------------------------- */
+        /* FONDO GENERAL                                  */
+        /* --------------------------------------------- */
+
+        .stApp {
+            background-color: #0f172a;
+            color: #e5e7eb;
+        }
+
+        .main {
+            background-color: #0f172a;
+        }
+
+        .block-container {
+            position: relative;
+            z-index: 2;
+            padding-top: 1.3rem;
+            padding-bottom: 1.5rem;
+        }
+
+        /* --------------------------------------------- */
+        /* MENU LATERAL                                   */
+        /* --------------------------------------------- */
+
+        section[data-testid="stSidebar"] {
+            background-color: #111827 !important;
+            border-right: 1px solid #334155;
+        }
+
+        section[data-testid="stSidebar"] > div {
+            background-color: #111827 !important;
+        }
+
+        section[data-testid="stSidebar"] * {
+            color: #f8fafc !important;
+        }
+
+        .sidebar-session {
+            background: linear-gradient(
+                135deg,
+                #1e293b,
+                #0f172a
+            );
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 18px 16px;
+            margin-top: 18px;
+            margin-bottom: 18px;
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.30);
+        }
+
+        .sidebar-label {
+            color: #94a3b8 !important;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 1.2px;
+            margin-bottom: 9px;
+        }
+
+        .sidebar-user {
+            color: #f8fafc !important;
+            font-size: 19px;
+            font-weight: 800;
+        }
+
+        section[data-testid="stSidebar"] .stButton > button {
+            width: 100%;
+            background-color: #f59e0b !important;
+            color: #111827 !important;
+            border: none !important;
+            border-radius: 10px !important;
+            font-weight: 800 !important;
+            padding: 10px 14px !important;
+            transition: 0.2s ease-in-out;
+        }
+
+        section[data-testid="stSidebar"] .stButton > button:hover {
+            background-color: #fbbf24 !important;
+            color: #111827 !important;
+            border: none !important;
+        }
+
+        /* --------------------------------------------- */
+        /* ENCABEZADOS                                    */
+        /* --------------------------------------------- */
+
+        .titulo-principal {
+            font-size: 42px;
+            font-weight: 800;
+            color: #f8fafc;
+            margin-bottom: 8px;
+            line-height: 1.15;
+        }
+
+        .subtitulo {
+            font-size: 18px;
+            color: #cbd5e1;
+            margin-bottom: 25px;
+            line-height: 1.4;
+        }
+
+        .section-title {
+            font-size: 25px;
+            font-weight: 800;
+            color: #f8fafc;
+            margin-top: 35px;
+            margin-bottom: 15px;
+            border-left: 6px solid #f59e0b;
+            padding-left: 12px;
+        }
+
+        /* --------------------------------------------- */
+        /* TARJETAS DE INDICADORES                        */
+        /* --------------------------------------------- */
+
+        .card {
+            background: linear-gradient(
+                135deg,
+                #1e293b,
+                #111827
+            );
+            padding: 22px;
+            border-radius: 18px;
+            box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.45);
+            text-align: center;
+            border: 1px solid #334155;
+            min-height: 118px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .card-title {
+            font-size: 15px;
+            color: #cbd5e1;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+
+        .card-value {
+            font-size: 31px;
+            color: #f59e0b;
+            font-weight: 900;
+            margin-top: 8px;
+        }
+
+        /* --------------------------------------------- */
+        /* TABLAS Y TEXTOS                                */
+        /* --------------------------------------------- */
+
+        div[data-testid="stDataFrame"] {
+            background-color: #1e293b;
+            border-radius: 12px;
+        }
+
+        .stSelectbox label,
+        .stMultiSelect label,
+        .stDateInput label,
+        .stNumberInput label,
+        div[data-testid="stTextInput"] label {
+            color: #e5e7eb !important;
+            font-weight: 700;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        p,
+        label {
+            color: #e5e7eb;
+        }
+
+        /* --------------------------------------------- */
+        /* FILTROS                                        */
+        /* --------------------------------------------- */
+
+        div[data-baseweb="select"] > div {
+            background-color: #f8fafc !important;
+            color: #0f172a !important;
+            border-radius: 10px !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+
+        div[data-baseweb="select"] span {
+            color: #0f172a !important;
+        }
+
+        input {
+            background-color: #f8fafc !important;
+            color: #0f172a !important;
+            border-radius: 8px !important;
+        }
+
+        /* --------------------------------------------- */
+        /* LOGO SUPERIOR                                  */
+        /* --------------------------------------------- */
+
+        .logo-header {
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-start;
+            width: 100%;
+            padding-top: 5px;
+        }
+
+        .logo-header img {
+            width: 190px;
+            max-width: 100%;
+            height: auto;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 6px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.35);
+        }
+
+        /* --------------------------------------------- */
+        /* SELLO DE AGUA                                  */
+        /* --------------------------------------------- */
+
+        .sello-agua {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            opacity: 0.08;
+            pointer-events: none;
+        }
+
+        .sello-agua img {
+            width: 620px;
+            max-width: 75vw;
+            height: auto;
+        }
+
+        /* --------------------------------------------- */
+        /* PIE DE PAGINA                                  */
+        /* --------------------------------------------- */
+
+        .footer-panel {
+            width: 100%;
+            margin-top: 65px;
+            padding: 24px 10px 12px 10px;
+            border-top: 1px solid rgba(148, 163, 184, 0.28);
+            text-align: center;
+            color: #94a3b8;
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .footer-panel strong {
+            color: #e2e8f0;
+            font-size: 15px;
+        }
+
+        /* --------------------------------------------- */
+        /* PANTALLA DE ACCESO                             */
+        /* --------------------------------------------- */
+
+        .login-title {
+            text-align: center;
+            color: #f8fafc;
+            font-size: 42px;
+            font-weight: 800;
+            margin-top: 80px;
+            margin-bottom: 8px;
+        }
+
+        .login-subtitle {
+            text-align: center;
+            color: #cbd5e1;
+            font-size: 17px;
+            margin-bottom: 25px;
+        }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# -------------------------------------------------------
+# ACCESO RESTRINGIDO
 # -------------------------------------------------------
 
 def validar_acceso():
     """
-    Valida el usuario y la contrasena registrados en Secrets.
-    El panel solamente se carga despues de iniciar sesion.
+    Permite visualizar el panel solamente despues de ingresar
+    un usuario y una contrasena configurados en Secrets.
     """
 
     if st.session_state.get("autenticado", False):
         return True
-
-    st.markdown(
-        """
-        <style>
-            .stApp {
-                background-color: #0f172a;
-            }
-
-            .login-title {
-                text-align: center;
-                color: #f8fafc;
-                font-size: 42px;
-                font-weight: 800;
-                margin-top: 80px;
-                margin-bottom: 8px;
-            }
-
-            .login-subtitle {
-                text-align: center;
-                color: #cbd5e1;
-                font-size: 17px;
-                margin-bottom: 25px;
-            }
-
-            div[data-testid="stTextInput"] label {
-                color: #e5e7eb !important;
-                font-weight: 700;
-            }
-
-            input {
-                background-color: #f8fafc !important;
-                color: #0f172a !important;
-                border-radius: 8px !important;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
 
     st.markdown(
         """
@@ -113,7 +395,9 @@ def validar_acceso():
                     st.rerun()
 
                 else:
-                    st.error("Usuario o contrasena incorrectos.")
+                    st.error(
+                        "Usuario o contrasena incorrectos."
+                    )
 
             except Exception:
                 st.error(
@@ -127,12 +411,28 @@ if not validar_acceso():
     st.stop()
 
 # -------------------------------------------------------
-# BOTON PARA CERRAR SESION
+# MENU LATERAL Y CIERRE DE SESION
 # -------------------------------------------------------
 
 with st.sidebar:
+    usuario_actual = st.session_state.get(
+        "usuario",
+        "Usuario"
+    )
+
     st.markdown(
-        f"**Sesion iniciada:** {st.session_state.get('usuario', '')}"
+        f"""
+        <div class="sidebar-session">
+            <div class="sidebar-label">
+                SESION INICIADA
+            </div>
+
+            <div class="sidebar-user">
+                👤 {usuario_actual}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
     if st.button(
@@ -156,7 +456,9 @@ def buscar_imagen(nombre_base):
     ]
 
     for extension in extensiones:
-        ruta = Path(f"{nombre_base}{extension}")
+        ruta = Path(
+            f"{nombre_base}{extension}"
+        )
 
         if ruta.exists():
             return ruta
@@ -166,7 +468,10 @@ def buscar_imagen(nombre_base):
 
 def convertir_imagen_base64(ruta_imagen):
     if ruta_imagen and ruta_imagen.exists():
-        with open(ruta_imagen, "rb") as imagen:
+        with open(
+            ruta_imagen,
+            "rb"
+        ) as imagen:
             return base64.b64encode(
                 imagen.read()
             ).decode()
@@ -174,8 +479,13 @@ def convertir_imagen_base64(ruta_imagen):
     return None
 
 
-ruta_logo_superior = buscar_imagen("logo1")
-ruta_sello_agua = buscar_imagen("logoredondo")
+ruta_logo_superior = buscar_imagen(
+    "logo1"
+)
+
+ruta_sello_agua = buscar_imagen(
+    "logoredondo"
+)
 
 logo_superior = convertir_imagen_base64(
     ruta_logo_superior
@@ -183,180 +493,6 @@ logo_superior = convertir_imagen_base64(
 
 sello_agua = convertir_imagen_base64(
     ruta_sello_agua
-)
-
-# -------------------------------------------------------
-# ESTILO GENERAL DEL PANEL
-# -------------------------------------------------------
-
-st.markdown(
-    """
-    <style>
-        .stApp {
-            background-color: #0f172a;
-            color: #e5e7eb;
-        }
-
-        .main {
-            background-color: #0f172a;
-        }
-
-        .block-container {
-            position: relative;
-            z-index: 2;
-            padding-top: 3rem;
-            padding-bottom: 1.5rem;
-        }
-
-        .titulo-principal {
-            font-size: 42px;
-            font-weight: 800;
-            color: #f8fafc;
-            margin-bottom: 8px;
-            line-height: 1.15;
-        }
-
-        .subtitulo {
-            font-size: 18px;
-            color: #cbd5e1;
-            margin-bottom: 25px;
-            line-height: 1.4;
-        }
-
-        .section-title {
-            font-size: 25px;
-            font-weight: 800;
-            color: #f8fafc;
-            margin-top: 35px;
-            margin-bottom: 15px;
-            border-left: 6px solid #f59e0b;
-            padding-left: 12px;
-        }
-
-        .card {
-            background: linear-gradient(
-                135deg,
-                #1e293b,
-                #111827
-            );
-            padding: 22px;
-            border-radius: 18px;
-            box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.45);
-            text-align: center;
-            border: 1px solid #334155;
-            min-height: 118px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .card-title {
-            font-size: 15px;
-            color: #cbd5e1;
-            font-weight: 600;
-            line-height: 1.25;
-        }
-
-        .card-value {
-            font-size: 31px;
-            color: #f59e0b;
-            font-weight: 900;
-            margin-top: 8px;
-        }
-
-        div[data-testid="stDataFrame"] {
-            background-color: #1e293b;
-            border-radius: 12px;
-        }
-
-        .stSelectbox label,
-        .stMultiSelect label,
-        .stDateInput label,
-        .stNumberInput label {
-            color: #e5e7eb !important;
-            font-weight: 700;
-        }
-
-        h1,
-        h2,
-        h3,
-        h4,
-        h5,
-        h6,
-        p,
-        label {
-            color: #e5e7eb;
-        }
-
-        div[data-baseweb="select"] > div {
-            background-color: #f8fafc !important;
-            color: #0f172a !important;
-            border-radius: 10px !important;
-            border: 1px solid #cbd5e1 !important;
-        }
-
-        div[data-baseweb="select"] span {
-            color: #0f172a !important;
-        }
-
-        input {
-            background-color: #f8fafc !important;
-            color: #0f172a !important;
-            border-radius: 8px !important;
-        }
-
-        .logo-header {
-            display: flex;
-            justify-content: flex-end;
-            align-items: flex-start;
-            width: 100%;
-            padding-top: 5px;
-        }
-
-        .logo-header img {
-            width: 190px;
-            max-width: 100%;
-            height: auto;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 6px;
-            border-radius: 10px;
-            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.35);
-        }
-
-        .sello-agua {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 0;
-            opacity: 0.08;
-            pointer-events: none;
-        }
-
-        .sello-agua img {
-            width: 620px;
-            max-width: 75vw;
-            height: auto;
-        }
-
-        .footer-panel {
-            width: 100%;
-            margin-top: 65px;
-            padding: 24px 10px 12px 10px;
-            border-top: 1px solid rgba(148, 163, 184, 0.28);
-            text-align: center;
-            color: #94a3b8;
-            font-size: 14px;
-            line-height: 1.7;
-        }
-
-        .footer-panel strong {
-            color: #e2e8f0;
-            font-size: 15px;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True
 )
 
 # -------------------------------------------------------
@@ -620,7 +756,7 @@ try:
                 ]
 
     # ---------------------------------------------------
-    # RANGO DE FECHAS
+    # FILTRO POR RANGO DE FECHAS
     # ---------------------------------------------------
 
     st.markdown(
@@ -707,65 +843,25 @@ try:
 
     with columna_indicador_1:
         st.markdown(
-            f"""
-            <div class="card">
-                <div class="card-title">
-                    Total litros consumidos
-                </div>
-
-                <div class="card-value">
-                    {total_litros:,.0f} L
-                </div>
-            </div>
-            """,
+            f'<div class="card"><div class="card-title">Total litros consumidos</div><div class="card-value">{total_litros:,.0f} L</div></div>',
             unsafe_allow_html=True
         )
 
     with columna_indicador_2:
         st.markdown(
-            f"""
-            <div class="card">
-                <div class="card-title">
-                    Cantidad de registros
-                </div>
-
-                <div class="card-value">
-                    {total_registros}
-                </div>
-            </div>
-            """,
+            f'<div class="card"><div class="card-title">Cantidad de registros</div><div class="card-value">{total_registros}</div></div>',
             unsafe_allow_html=True
         )
 
     with columna_indicador_3:
         st.markdown(
-            f"""
-            <div class="card">
-                <div class="card-title">
-                    Promedio por carga
-                </div>
-
-                <div class="card-value">
-                    {promedio_carga:,.1f} L
-                </div>
-            </div>
-            """,
+            f'<div class="card"><div class="card-title">Promedio por carga</div><div class="card-value">{promedio_carga:,.1f} L</div></div>',
             unsafe_allow_html=True
         )
 
     with columna_indicador_4:
         st.markdown(
-            f"""
-            <div class="card">
-                <div class="card-title">
-                    Promedio mensual de consumo diesel
-                </div>
-
-                <div class="card-value">
-                    {promedio_mensual_consumo:,.0f} L
-                </div>
-            </div>
-            """,
+            f'<div class="card"><div class="card-title">Promedio mensual de consumo diesel</div><div class="card-value">{promedio_mensual_consumo:,.0f} L</div></div>',
             unsafe_allow_html=True
         )
 
